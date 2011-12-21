@@ -1,7 +1,38 @@
-@(message: String)
+@(host: String)
+@main("Snake multiplayer") {
 
-@main("Welcome to Play 2.0 RC1") {
+<script type="text/javascript">
+	var snakeGameWebsocket = "@{ "ws://"+ host + routes.MultiplayerSnakeGame.client() }";
+</script>
 
-    @play20.welcome(message)
+<script src="@routes.Assets.at("javascripts/snake-game/game-multiplayer.js")" type="text/javascript""></script>
+<link href='http://fonts.googleapis.com/css?family=Gruppo' rel='stylesheet' type='text/css'>
+
+	<section class="gameWrapper">
+		<header>
+			<h1>Snake Game</h1>
+		</header>
+
+		<aside class="left">
+			<div class="gameOver">
+				<div class="inner">
+					Game over, your score is <span class="finalScore"></span>
+					<div class="restart">
+						<a href="javascript:;"><span><span>Restart</a>
+					</div>
+				</div>
+			</div>
+			<canvas id="game" width="400" height="400"></canvas>
+		</aside>
+
+		<aside class="right">
+			<div class="score">0</div>
+		</aside>
+
+		<div class="credits">
+			This game was made to try CoffeeScript.
+			 Have a look at the <a href="https://github.com/sylvainmathieu/snake-game/blob/master/public/javascripts/snake-game/game-multiplayer.coffee">source code</a>.
+		</div>
+	</section>
 
 }

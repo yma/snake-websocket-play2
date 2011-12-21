@@ -1,0 +1,110 @@
+
+@background: #1b003f;
+@backgroundTop: #42009c;
+
+.border-radius (@radius) {
+	border-radius: @radius;
+	-moz-border-radius: @radius;
+	-webkit-border-radius: @radius;
+}
+
+.border-radius (@tl, @tr, @br, @bl) {
+	border-radius: @tl @tr @br @bl;
+	-moz-border-radius: @tl @tr @br @bl;
+	-webkit-border-radius: @tl @tr @br @bl;
+}
+
+body {
+	background: @background url(/assets/images/bg-header.png) repeat-x left top;
+	font-family: sans-serif;
+	color: white;
+}
+
+.button {
+	.border-radius(20px);
+	height: 20px;
+	color: white;
+	background-color: #216400;
+	padding: 5px 20px;
+	text-decoration: none;
+	&:hover {
+		border: 3px solid rgba(255,255,255,0.5)
+	}
+}
+
+.gameWrapper {
+	header {
+		h1 {
+			font-size: 2.5em;
+			color: rgba(255,255,255,0.8);
+			text-shadow: 2px 2px 1px #000000;
+			font-weight: normal;
+		}
+	}
+
+	width: 800px;
+	margin: auto;
+
+	aside.left {
+		position: relative;
+		float: left;
+		width: 400px;
+		.gameOver {
+			width: 406px;
+			height: 406px;
+			display: none;
+			position: absolute;
+			background: rgba(0,0,0,0.5);
+			.inner {
+				padding-top: 160px;
+				text-align: center;
+				color: rgba(255,255,255,0.5);
+				.finalScore {
+					font-family: 'Gruppo', sans-serif;
+					color: white;
+					font-size: 2em;
+				}
+			}
+			.restart {
+				padding: 10px;
+				a {
+					.button;
+				}
+			}
+		}
+	}
+
+	aside.right {
+		width: 380px;
+		float: right;
+
+		.score {
+			margin: 0 10px;
+			padding: 10px 20px;
+			background: black;
+			color: white;
+			height: 30px;
+			font-family: 'Gruppo', sans-serif;
+			font-size: 2em;
+			border: 3px solid @background + #333333;
+		}
+	}
+
+	.credits {
+		text-align: center;
+		font-size: 0.8em;
+		color: rgba(255,255,255,0.5);
+		clear: both;
+		padding: 20px 0;
+		a {
+			color: white;
+			&:hover {
+				text-decoration: none
+			}
+		}
+	}
+}
+
+#game {
+	border: 3px solid @background + #333333
+}
