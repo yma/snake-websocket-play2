@@ -9,33 +9,21 @@ KEY =
 
 
 gameCodecBase = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-+"
-gameCodecEncode = (num, size) ->
-	n = num
-	buffer = ""
-	for i in [0..(size-1)]
-		buffer += gameCodecBase.charAt(n & 0x3f)
-		n >>= 6
-	if n != 0
+gameCodecEncode = (num) ->
+	if num < 0 || num >= 255
 		alert("Can't encode "+ num +" ("+ size +")")
-	buffer
+	String.fromCharCode(num + 1)
 
 gameCodecDecode = (code) ->
-	n = 0
-	for i in [(code.length-1)..0]
-		j = gameCodecBase.indexOf(code.charAt(i))
-		if (j == -1)
-			n = j
-			break
-		n = (n << 6) | j
-	if n < 0
+	if code.length != 1
 		alert("Invalid code "+ code)
-	n
+	code.charCodeAt(0) - 1
 
 decodeEntity = (code) ->
-	id: gameCodecDecode(code.substring(0,1))
+	id: gameCodecDecode(code[0])
 	pos:
-		x: gameCodecDecode(code.substring(1,3))
-		y: gameCodecDecode(code.substring(3,5))
+		x: gameCodecDecode(code[1])
+		y: gameCodecDecode(code[2])
 
 
 drawBlock = (pos) ->
@@ -51,7 +39,7 @@ eraseBlock = (pos) ->
 tick = (gameCode) ->
 	while gameCode != ""
 		entity = decodeEntity gameCode
-		gameCode = gameCode.substring(5)
+		gameCode = gameCode.substring(3)
 		if entity.id != 0
 			drawBlock entity.pos
 		else
@@ -66,7 +54,7 @@ connectServer = (f) ->
 	ws.onmessage = (e) -> tick(e.data)
 	ws.onerror = (e) -> alert("error: "+ e.data)
 
-	command: (vector) -> ws.send(gameCodecEncode(vector, 1))
+	command: (vector) -> ws.send(gameCodecEncode(vector))
 
 init = ->
 	map = (0 for y in [0..(gridSize - 1)] for x in [0..(gridSize - 1)])
@@ -77,8 +65,6 @@ init = ->
 
 	ctx.fillStyle = "#27005b"
 	ctx.fillRect 0, 0, gridSize * 10, gridSize * 10
-
-	console.log(decodeEntity "12345")
 
 $ ->
 	server = connectServer ->

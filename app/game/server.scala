@@ -107,7 +107,10 @@ class Client(instance: Instance, out: Iteratee[String, Unit]) extends Actor {
 		import message.client._
 		loop {
 			react {
-				case Command(code) => instance ! message.instance.Command(this, Vector.fromCode(code))
+				case Command(code) => {
+					assert(code.length == 1)
+					instance ! message.instance.Command(this, Vector.fromCode(code(0)))
+				}
 				case Stop() => {
 					instance ! message.instance.Leave(this)
 					exit()

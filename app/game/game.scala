@@ -23,7 +23,7 @@ object Vector {
 			Down.direction -> Down,
 			Left.direction -> Left)
 
-	def fromCode(code: String): Vector = directions(Codec.decode(code))
+	def fromCode(code: Char): Vector = directions(Codec.decode(code))
 }
 
 
@@ -35,7 +35,7 @@ case class Position(val x: Int, val y: Int) extends CodeChunk {
 		case Vector.Left => new Position(x-1, y)
 	}
 
-	override def codeChunk: String = Codec.encode(x, 2) + Codec.encode(y, 2)
+	override def codeChunk: String = ""+ Codec.encode(x) + Codec.encode(y)
 
 	override def toString: String = x +","+ y
 }
@@ -49,7 +49,7 @@ class Entity(val id: Int, val weight: Int, val pos: Position, val updated: Boole
 		else new Entity(0, 0, pos, true)
 	}
 
-	override def codeChunk: String = Codec.encode(id, 1) + pos.codeChunk
+	override def codeChunk: String = Codec.encode(id) + pos.codeChunk
 
 	override def toString: String = "E"+ id +"P"+ pos
 }
