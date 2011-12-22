@@ -1,6 +1,7 @@
 package game.server
 
 import game._
+import game.codec._
 import java.util.Date
 import play.api.libs.iteratee._
 import scala.actors.Actor
@@ -82,9 +83,8 @@ class Instance(val name: String, private var area: Area) extends Actor {
 
 					area = area.tick()
 
-					lazy val entitiesCode = toCode(area.entities)
-					lazy val updatedEntitiesCode = toCode(area.updatedEntities())
-					def toCode(entities: List[Entity]) = entities.foldLeft("")(_ + _.elementCode)
+					lazy val entitiesCode = Codec.encode(area.entities)
+					lazy val updatedEntitiesCode = Codec.encode(area.updatedEntities())
 					for (client <- clientIds.keys) {
 						client ! message.client.Tick(
 								if (fullAreaCode.getOrElse(client, false)) {
@@ -108,8 +108,7 @@ class Client(instance: Instance, out: Iteratee[String, Unit]) extends Actor {
 		loop {
 			react {
 				case Command(code) => {
-					assert(code.length == 1)
-					instance ! message.instance.Command(this, Vector.fromCode(code(0)))
+					instance ! message.instance.Command(this, Codec.decode[Vector](code))
 				}
 				case Stop() => {
 					instance ! message.instance.Leave(this)

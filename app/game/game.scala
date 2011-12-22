@@ -2,8 +2,6 @@ package game
 
 import scala.util.Random
 
-import game.codec._
-
 
 class Vector(val direction: Int) {
 	def reverse: Vector = Vector.directions((direction + 2) & 0x3)
@@ -22,12 +20,10 @@ object Vector {
 			Right.direction -> Right,
 			Down.direction -> Down,
 			Left.direction -> Left)
-
-	def fromCode(code: Char): Vector = directions(Codec.decode(code))
 }
 
 
-case class Position(val x: Int, val y: Int) extends CodeChunk {
+case class Position(val x: Int, val y: Int) {
 	def +(v: Vector): Position = v match {
 		case Vector.Up => new Position(x, y-1)
 		case Vector.Right => new Position(x+1, y)
@@ -35,21 +31,17 @@ case class Position(val x: Int, val y: Int) extends CodeChunk {
 		case Vector.Left => new Position(x-1, y)
 	}
 
-	override def codeChunk: String = ""+ Codec.encode(x) + Codec.encode(y)
-
 	override def toString: String = x +","+ y
 }
 
 
-class Entity(val id: Int, val weight: Int, val pos: Position, val updated: Boolean) extends CodeElement {
+class Entity(val id: Int, val weight: Int, val pos: Position, val updated: Boolean) {
 	def alive: Boolean = id != 0
 
 	def tick(): Entity = {
 		if (weight > 0) new Entity(id, weight-1, pos, false)
 		else new Entity(0, 0, pos, true)
 	}
-
-	override def codeChunk: String = Codec.encode(id) + pos.codeChunk
 
 	override def toString: String = "E"+ id +"P"+ pos
 }
