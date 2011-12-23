@@ -33,7 +33,7 @@ package message {
 
 	package ticker {
 		case class Stop()
-		case class Tick(instance: Instance, count: Int)
+		case class WaitTick(instance: Instance, count: Int)
 	}
 }
 
@@ -53,7 +53,7 @@ class Instance(val name: String, private var area: Area) extends Actor {
 		if (ticker == None) {
 			tickCount = 0
 			ticker = Option(new Ticker(100))
-			ticker.get ! message.ticker.Tick(this, tickCount)
+			ticker.get ! message.ticker.WaitTick(this, tickCount)
 		}
 	}
 
@@ -96,7 +96,7 @@ class Instance(val name: String, private var area: Area) extends Actor {
 				}
 				case Tick(ticker, count) => {
 					tickCount = count
-					ticker ! message.ticker.Tick(this, count + 1)
+					ticker ! message.ticker.WaitTick(this, count + 1)
 
 					area = area.tick()
 
@@ -203,12 +203,11 @@ class Ticker(val duration: Long) extends Actor {
 				case Stop() => {
 					exit()
 				}
-				case Tick(actor: Actor, count: Int) => {
-					val now = System.currentTimeMillis()
+				case WaitTick(instance, count) => {
 					val countTime = startTime + count * duration
-					val sleepTime = countTime - now;
+					val sleepTime = countTime - System.currentTimeMillis();
 					if (sleepTime > 0) Thread.sleep(sleepTime)
-					actor ! message.instance.Tick(this, count)
+					instance ! message.instance.Tick(this, count)
 				}
 			}
 		}
