@@ -5,6 +5,7 @@ import game.codec._
 import java.util.Date
 import play.api.libs.iteratee._
 import scala.actors.Actor
+import scala.util.Random
 
 
 package message {
@@ -13,13 +14,21 @@ package message {
 		case class Enter(client: Client)
 		case class FullAreaCode(client: Client)
 		case class Leave(client: Client)
+		case class PlayerId(client: Client, slot: Int)
 		case class Tick(ticker: Ticker, count: Int)
 	}
 
 	package client {
 		case class Command(code: String)
+		case class PlayerId(slot: Int)
 		case class Stop()
 		case class Tick(code: String)
+	}
+
+	package slots {
+		case class Stop()
+		case class Register(instance: Instance, client: Client, area: Area)
+		case class Unregister(slot: Int)
 	}
 
 	package ticker {
@@ -30,7 +39,8 @@ package message {
 
 
 class Instance(val name: String, private var area: Area) extends Actor {
-	private var lastId: Int = 0
+	val players = new Slots(Slot.Players)
+
 	private var tickCount = 0
 	private var ticker: Option[Ticker] = None
 
@@ -58,24 +68,31 @@ class Instance(val name: String, private var area: Area) extends Actor {
 		import message.instance._
 		loop {
 			react {
-				case Command(actor, vector) => {
-					area = area.update(clientIds(actor), vector)
-				}
 				case Enter(client) => {
-					lastId += 1
-					clientIds += client -> lastId
+					players ! message.slots.Register(this, client, area)
+				}
+				case PlayerId(client, id) => {
+					if (id != Slot.none) area = area.newMob(id)
+					clientIds += client -> id
 					fullAreaCode += client -> true
-					area = area.newMob(lastId, 30)
 					startTicker()
+					client ! message.client.PlayerId(id)
 				}
-				case FullAreaCode(client) => {
-					fullAreaCode += client -> true
-				}
+
 				case Leave(client) => {
+					players ! message.slots.Unregister(clientIds(client))
 					clientIds -= client
 					if (clientIds.isEmpty) {
 						stopTicker()
 					}
+				}
+
+				case Command(client, vector) => {
+					area = area.update(clientIds(client), vector)
+				}
+
+				case FullAreaCode(client) => {
+					fullAreaCode += client -> true
 				}
 				case Tick(ticker, count) => {
 					tickCount = count
@@ -110,12 +127,64 @@ class Client(instance: Instance, out: Iteratee[String, Unit]) extends Actor {
 				case Command(code) => {
 					instance ! message.instance.Command(this, Codec.decode[Vector](code))
 				}
+				case PlayerId(id: Int) => {
+				}
 				case Stop() => {
 					instance ! message.instance.Leave(this)
 					exit()
 				}
 				case Tick(code) => {
 					out.feed(new Input.El(code))
+				}
+			}
+		}
+	}
+}
+
+
+object Slot {
+	val none = 0
+
+	trait Range {
+		val slots: Set[Int]
+	}
+
+	object Players extends Range {
+		override val slots = 1.until(128).toSet
+	}
+	object Items extends Range {
+		override val slots = 128.until(160).toSet
+	}
+}
+
+class Slots(allocable: Slot.Range) extends Actor {
+	private val registered = scala.collection.mutable.Set[Int]()
+	private val rand = new Random()
+
+	start()
+
+	def allocSlot(entities: Seq[Int]): Int = {
+		val freeSlots = (allocable.slots -- registered -- entities).toSeq
+		if (freeSlots.isEmpty) Slot.none
+		else {
+			val slot = freeSlots(rand.nextInt(freeSlots.size))
+			registered += slot
+			slot
+		}
+	}
+
+	def act() {
+		import message.slots._
+		loop {
+			react {
+				case Stop() => {
+					exit()
+				}
+				case Register(instance, client, area) => {
+					instance ! message.instance.PlayerId(client, allocSlot(area.entities map { _.id }))
+				}
+				case Unregister(slot) => {
+					registered -= slot
 				}
 			}
 		}

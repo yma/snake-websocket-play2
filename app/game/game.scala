@@ -103,8 +103,8 @@ class Area(val rand: Random, val width: Int, val height: Int, val entities: List
 
 	def updatedEntities(): List[Entity] = entities filter { _.updated }
 
-	def newMob(id: Int, weight: Int): Area = {
+	def newMob(id: Int): Area = {
 		assert(entities.filter(_.id == id).isEmpty)
-		new Area(rand, width, height, new Mob(id, weight, randomPosition(), randomVector(), true) :: entities, updates)
+		new Area(rand, width, height, new Mob(id, 30, randomPosition(), randomVector(), true) :: entities, updates)
 	}
 }

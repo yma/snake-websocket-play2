@@ -1,7 +1,6 @@
 package game
 
 package object codec {
-	import game._
 
 	object Codec {
 		def encode(num: Int): Char = {
