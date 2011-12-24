@@ -39,7 +39,7 @@ package message {
 
 
 class Instance(val name: String, private var area: Area) extends Actor {
-	val players = new Slots(Slot.Players)
+	val players = new Slots(resource.Slot.Players)
 
 	private var tickCount = 0
 	private var ticker: Option[Ticker] = None
@@ -53,7 +53,7 @@ class Instance(val name: String, private var area: Area) extends Actor {
 		if (ticker == None) {
 			tickCount = 0
 			ticker = Option(new Ticker(100))
-			ticker.get ! message.ticker.WaitTick(this, tickCount)
+			ticker.get ! message.ticker.WaitTick(this, tickCount + 1)
 		}
 	}
 
@@ -72,7 +72,7 @@ class Instance(val name: String, private var area: Area) extends Actor {
 					players ! message.slots.Register(this, client, area)
 				}
 				case PlayerId(client, id) => {
-					if (id != Slot.none) area = area.newMob(id)
+					if (id != resource.Slot.none) area = area.newMob(id, tickCount + 1)
 					clientIds += client -> id
 					fullAreaCode += client -> true
 					startTicker()
@@ -98,10 +98,10 @@ class Instance(val name: String, private var area: Area) extends Actor {
 					tickCount = count
 					ticker ! message.ticker.WaitTick(this, count + 1)
 
-					area = area.tick()
+					area = area.tick(count)
 
 					lazy val entitiesCode = Codec.encode(area.entities)
-					lazy val updatedEntitiesCode = Codec.encode(area.updatedEntities())
+					lazy val updatedEntitiesCode = Codec.encode(area.updatedEntities(count))
 					for (client <- clientIds.keys) {
 						client ! message.client.Tick(
 								if (fullAreaCode.getOrElse(client, false)) {
@@ -142,22 +142,7 @@ class Client(instance: Instance, out: Iteratee[String, Unit]) extends Actor {
 }
 
 
-object Slot {
-	val none = 0
-
-	trait Range {
-		val slots: Set[Int]
-	}
-
-	object Players extends Range {
-		override val slots = 1.until(128).toSet
-	}
-	object Items extends Range {
-		override val slots = 128.until(160).toSet
-	}
-}
-
-class Slots(allocable: Slot.Range) extends Actor {
+class Slots(allocable: resource.Slot.Range) extends Actor {
 	private val registered = scala.collection.mutable.Set[Int]()
 	private val rand = new Random()
 
@@ -165,7 +150,7 @@ class Slots(allocable: Slot.Range) extends Actor {
 
 	def allocSlot(entities: Seq[Int]): Int = {
 		val freeSlots = (allocable.slots -- registered -- entities).toSeq
-		if (freeSlots.isEmpty) Slot.none
+		if (freeSlots.isEmpty) resource.Slot.none
 		else {
 			val slot = freeSlots(rand.nextInt(freeSlots.size))
 			registered += slot

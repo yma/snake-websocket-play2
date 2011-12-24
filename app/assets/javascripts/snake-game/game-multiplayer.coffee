@@ -7,6 +7,27 @@ KEY =
 	RIGHT_ARROW: 39
 	DOWN_ARROW: 40
 
+Item =
+	0:
+		r: 127
+		g: 127
+		b: 127
+	128: # food
+		r: 0
+		g: 127
+		b: 0
+	129: # eatenFood
+		r: 0
+		g: 192
+		b: 0
+	130: # exploded
+		r: 255
+		g: 0
+		b: 0
+
+rgb = (item) -> "rgb(" + item.r + "," + item.g + "," + item.b + ")"
+rgba = (item, alpha) -> "rgba(" + item.r + "," + item.g + "," + item.b + ", " + alpha + ")"
+
 
 gameCodecBase = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-+"
 gameCodecEncode = (num) ->
@@ -26,10 +47,11 @@ decodeEntity = (code) ->
 		y: gameCodecDecode(code[2])
 
 
-drawBlock = (pos) ->
-	ctx.strokeStyle = "rgba(255,255,255, 0.5)"
+drawBlock = (pos, item) ->
+	eraseBlock pos
+	ctx.strokeStyle = rgb(item)
 	ctx.strokeRect pos.x * 10 + 0.5, pos.y * 10 + 0.5, 8, 8
-	ctx.fillStyle = "rgba(255,255,255,0.2)"
+	ctx.fillStyle = rgba(item, 0.5)
 	ctx.fillRect pos.x * 10 + 0.5, pos.y * 10 + 0.5, 8, 8
 
 eraseBlock = (pos) ->
@@ -41,7 +63,10 @@ tick = (gameCode) ->
 		entity = decodeEntity gameCode
 		gameCode = gameCode.substring(3)
 		if entity.id != 0
-			drawBlock entity.pos
+			item = Item[entity.id]
+			if item == undefined
+				item = Item[0]
+			drawBlock(entity.pos, item)
 		else
 			eraseBlock entity.pos
 

@@ -53,7 +53,7 @@ package object codec {
 		override def encode(entity: Entity): String = Codec.encode(entity.id) + PositionCoder.encode(entity.pos)
 		override def decode(code: String): Entity = {
 			assert(code.length == chunkSize)
-			new Entity(Codec.decode(code(0)), 0, PositionCoder.decode(code.substring(1)), false)
+			new Entity(Codec.decode(code(0)), 0, PositionCoder.decode(code.substring(1)), 0)
 		}
 	}
 
