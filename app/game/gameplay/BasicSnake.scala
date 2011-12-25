@@ -36,10 +36,9 @@ class EvilMob(slot: Slot, weight: Int, pos: Position, vector: Vector, eaten: Boo
 
 class EvilClient(instance: Instance) extends Client(instance) {
 	private val rand = new Random()
-
 	override def slots: Slots = instance.gameplaySlots
 
-	override def dead(slot: Slot) { this ! message.client.Stop() }
+	override def dead(entity: Entity) { this ! 'stop }
 
 	override def tick(count: Int, code: String) {
 		if (rand.nextInt(3) == 0) {

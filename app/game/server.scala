@@ -6,7 +6,8 @@ import game.gameplay._
 import game.resource._
 import java.util.Date
 import play.api.libs.iteratee._
-import scala.actors.Actor
+import scala.actors._
+import scala.actors.Actor._
 import scala.util.Random
 
 
@@ -15,27 +16,20 @@ package message {
 		case class Command(client: Client, vector: Vector)
 		case class ClientSlot(client: Client, slot: Slot)
 		case class FullAreaCode(client: Client)
-		case class Leave(client: Client, slots: Slots)
+		case class Leave(client: Client)
 		case class Tick(ticker: Ticker, count: Int)
 	}
 
 	package client {
 		case class Command(code: String)
 		case class ClientSlot(slot: Slot)
-		case class Dead(slot: Slot)
-		case class Stop()
+		case class Dead(entity: Entity)
 		case class Tick(count: Int, code: String)
 	}
 
 	package slots {
-		case class Stop()
 		case class Register(instance: Instance, client: Client, area: Area)
 		case class Unregister(slot: Slot)
-	}
-
-	package ticker {
-		case class Stop()
-		case class WaitTick(instance: Instance, count: Int)
 	}
 }
 
@@ -54,15 +48,16 @@ class Instance(val name: String, private var area: Area, gameplay: Gameplay) ext
 
 	private def startTicker() {
 		if (ticker == None) {
-			tickCount = 0
-			ticker = Option(new Ticker(100))
-			ticker.get ! message.ticker.WaitTick(this, tickCount + 1)
+			play.api.Logger.debug("instance turn on")
+			ticker = Option(new Ticker(100, tickCount))
+			ticker.get.waitNextTick(this, tickCount)
 		}
 	}
 
 	private def stopTicker() {
 		if (ticker != None) {
-			ticker.get ! message.ticker.Stop()
+			play.api.Logger.debug("instance turn off")
+			ticker.get ! 'stop
 			ticker = None
 		}
 	}
@@ -71,12 +66,12 @@ class Instance(val name: String, private var area: Area, gameplay: Gameplay) ext
 		area = area.update(mobSlot, vector)
 	}
 
-	def clientEnter(client: Client, slots: Slots) {
-		slots ! message.slots.Register(this, client, area)
+	def clientEnter(client: Client) {
+		client.slots ! message.slots.Register(this, client, area)
 	}
 
-	def clientLeave(client: Client, slots: Slots) {
-		this ! message.instance.Leave(client, slots)
+	def clientLeave(client: Client) {
+		this ! message.instance.Leave(client)
 	}
 
 	def act() {
@@ -94,8 +89,8 @@ class Instance(val name: String, private var area: Area, gameplay: Gameplay) ext
 					client ! message.client.ClientSlot(slot)
 				}
 
-				case Leave(client, slots) => {
-					slots ! message.slots.Unregister(clientSlots(client))
+				case Leave(client) => {
+					client.slots ! message.slots.Unregister(clientSlots(client))
 					clientSlots -= client
 					if (clientSlots.isEmpty) {
 						stopTicker()
@@ -111,16 +106,28 @@ class Instance(val name: String, private var area: Area, gameplay: Gameplay) ext
 				}
 				case Tick(ticker, count) => {
 					tickCount = count
-					ticker ! message.ticker.WaitTick(this, count + 1)
+					ticker.waitNextTick(this, count)
+
+					val beforeEntities = area.entities
 
 					gameplay.tick(this, count)
 					area = area.tick(count, gameplay)
 
-					val deadEntites = (for (entity <- area.entities if !entity.alive) yield { entity.slot }).toSet
+					val afterEntities = area.entities
+					val clientSlotsSnapshot = clientSlots.toMap
+
+					actor {
+						val beforeMobs = (for (e <- beforeEntities if e.alive && e.isInstanceOf[Mob]) yield { e.slot -> e }).toMap
+						val afterMobSlots = (for (e <- afterEntities if e.alive && e.isInstanceOf[Mob]) yield { e.slot }).toSet
+						val deadMobSlots = (beforeMobs.keySet -- afterMobSlots).toSet
+
+						for ((client, slot) <- clientSlotsSnapshot if deadMobSlots.contains(slot))
+							client ! message.client.Dead(beforeMobs(slot))
+					}
+
 					lazy val entitiesCode = Codec.encode(area.entities)
 					lazy val updatedEntitiesCode = Codec.encode(area.updatedEntities(count))
 					for ((client, slot) <- clientSlots) {
-						if (deadEntites.contains(slot)) client ! message.client.Dead(slot)
 						client ! message.client.Tick(count,
 								if (fullAreaCode.getOrElse(client, false)) {
 									fullAreaCode -= client
@@ -135,10 +142,10 @@ class Instance(val name: String, private var area: Area, gameplay: Gameplay) ext
 
 
 abstract class Client(instance: Instance) extends Actor {
-	start()
-	instance.clientEnter(this, slots)
-
 	def slots: Slots
+
+	start()
+	instance.clientEnter(this)
 
 	def spawnMob(slot: Slot, pos: Position, vector: Vector, tick: Int): Mob
 
@@ -148,9 +155,9 @@ abstract class Client(instance: Instance) extends Actor {
 			react {
 				case Command(code) => command(code)
 				case ClientSlot(slot) => clientSlot(slot)
-				case Dead(slot) => dead(slot)
-				case Stop() => { stop(); exit() }
+				case Dead(entity: Entity) => dead(entity)
 				case Tick(count, code) => tick(count, code)
+				case 'stop => { stop(); exit }
 			}
 		}
 	}
@@ -158,12 +165,13 @@ abstract class Client(instance: Instance) extends Actor {
 	def command(code :String) {
 		instance ! message.instance.Command(this, Codec.decode[Vector](code))
 	}
+
 	def clientSlot(slot: Slot) {}
 
-	def dead(slot: Slot) {}
+	def dead(entity: Entity) {}
 
 	def stop() {
-		instance.clientLeave(this, slots)
+		instance.clientLeave(this)
 	}
 
 	def tick(count: Int, code: String) {}
@@ -199,38 +207,46 @@ class Slots(allocable: Slot.Range) extends Actor {
 		import message.slots._
 		loop {
 			react {
-				case Stop() => {
-					exit()
-				}
 				case Register(instance, client, area) => {
 					instance ! message.instance.ClientSlot(client, allocSlot(area.entities map { _.slot }))
 				}
 				case Unregister(slot) => {
 					registered -= slot
 				}
+				case 'stop => exit
 			}
 		}
 	}
 }
 
 
-class Ticker(val duration: Long) extends Actor {
-	val startTime = System.currentTimeMillis()
+class Ticker(val duration: Long, countOffset: Int) extends Actor {
+	val startTime = System.currentTimeMillis() - countOffset * duration
 	start()
 
+	def waitNextTick(instance: Instance, count: Int) {
+		this ! WaitTick(instance, count + 1)
+	}
+
+	case class WaitTick(instance: Instance, count: Int)
+
+	private def sendTick(instance: Instance, count: Int) {
+		instance ! message.instance.Tick(this, count)
+	}
+
 	def act() {
-		import message.ticker._
 		loop {
 			react {
-				case Stop() => {
-					exit()
-				}
 				case WaitTick(instance, count) => {
 					val countTime = startTime + count * duration
 					val sleepTime = countTime - System.currentTimeMillis();
-					if (sleepTime > 0) Thread.sleep(sleepTime)
-					instance ! message.instance.Tick(this, count)
+					if (sleepTime > 0) actor {
+						self.reactWithin(sleepTime) {
+							case TIMEOUT => sendTick(instance, count)
+						}
+					} else sendTick(instance, count)
 				}
+				case 'stop => exit
 			}
 		}
 	}

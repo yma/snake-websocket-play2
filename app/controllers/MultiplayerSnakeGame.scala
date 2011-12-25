@@ -25,7 +25,7 @@ object MultiplayerSnakeGame extends Controller {
 		out <<: in.map {
 			case Input.EOF => {
 				Logger.info("disconnected")
-				client ! Stop()
+				client ! 'stop
 				Input.EOF
 			}
 			case Input.El(command) => {
