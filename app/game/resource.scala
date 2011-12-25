@@ -1,21 +1,23 @@
 package game.resource
 
 
+case class Slot(value: Int)
+
 object Slot {
-	val none = 0
+	val none = Slot(0)
 
-	trait Range {
-		val slots: Set[Int]
+	class Range(start: Int, end: Int) {
+		val slots = start.until(end).map(Slot(_)).toSet
 	}
 
-	object Players extends Range {
-		override val slots = 1.until(128).toSet
-	}
-	object Item extends Range {
-		override val slots = 128.until(160).toSet
+	object Players extends Range(1, 128)
 
-		val food = 128
-		val eatenFood = 129
-		val exploded = 130
+	object Item extends Range(128, 160) {
+		val food = Slot(128)
+		val eatenFood = Slot(129)
+		val exploded = Slot(130)
+		val evilSnake = Slot(131)
 	}
+
+	object Gameplay extends Range(1000, 2000)
 }

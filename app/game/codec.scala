@@ -49,11 +49,17 @@ package object codec {
 	}
 
 	implicit object EntityCoder extends Codec.Coder[Entity] {
+		import resource._
+
 		override val chunkSize: Int = 1 + PositionCoder.chunkSize
-		override def encode(entity: Entity): String = Codec.encode(entity.id) + PositionCoder.encode(entity.pos)
+
+		override def encode(entity: Entity): String =
+			Codec.encode((if (entity.alive) entity.slotCode else Slot.none).value) +
+			PositionCoder.encode(entity.pos)
+
 		override def decode(code: String): Entity = {
 			assert(code.length == chunkSize)
-			new Entity(Codec.decode(code(0)), 0, PositionCoder.decode(code.substring(1)), 0)
+			new Entity(Slot(Codec.decode(code(0))), 0, PositionCoder.decode(code.substring(1)), 0)
 		}
 	}
 

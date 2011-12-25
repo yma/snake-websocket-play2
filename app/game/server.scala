@@ -2,6 +2,8 @@ package game.server
 
 import game._
 import game.codec._
+import game.gameplay._
+import game.resource._
 import java.util.Date
 import play.api.libs.iteratee._
 import scala.actors.Actor
@@ -11,24 +13,24 @@ import scala.util.Random
 package message {
 	package instance {
 		case class Command(client: Client, vector: Vector)
-		case class Enter(client: Client)
+		case class ClientSlot(client: Client, slot: Slot)
 		case class FullAreaCode(client: Client)
-		case class Leave(client: Client)
-		case class PlayerId(client: Client, slot: Int)
+		case class Leave(client: Client, slots: Slots)
 		case class Tick(ticker: Ticker, count: Int)
 	}
 
 	package client {
 		case class Command(code: String)
-		case class PlayerId(slot: Int)
+		case class ClientSlot(slot: Slot)
+		case class Dead(slot: Slot)
 		case class Stop()
-		case class Tick(code: String)
+		case class Tick(count: Int, code: String)
 	}
 
 	package slots {
 		case class Stop()
 		case class Register(instance: Instance, client: Client, area: Area)
-		case class Unregister(slot: Int)
+		case class Unregister(slot: Slot)
 	}
 
 	package ticker {
@@ -38,13 +40,14 @@ package message {
 }
 
 
-class Instance(val name: String, private var area: Area) extends Actor {
-	val players = new Slots(resource.Slot.Players)
+class Instance(val name: String, private var area: Area, gameplay: Gameplay) extends Actor {
+	val playerSlots = new Slots(Slot.Players)
+	val gameplaySlots = new Slots(Slot.Gameplay)
 
 	private var tickCount = 0
 	private var ticker: Option[Ticker] = None
 
-	private val clientIds = scala.collection.mutable.Map[Client, Int]()
+	private val clientSlots = scala.collection.mutable.Map[Client, Slot]()
 	private val fullAreaCode = scala.collection.mutable.Map[Client, Boolean]()
 
 	start()
@@ -64,31 +67,43 @@ class Instance(val name: String, private var area: Area) extends Actor {
 		}
 	}
 
+	def updateMob(mobSlot: Slot, vector: Vector) {
+		area = area.update(mobSlot, vector)
+	}
+
+	def clientEnter(client: Client, slots: Slots) {
+		slots ! message.slots.Register(this, client, area)
+	}
+
+	def clientLeave(client: Client, slots: Slots) {
+		this ! message.instance.Leave(client, slots)
+	}
+
 	def act() {
 		import message.instance._
 		loop {
 			react {
-				case Enter(client) => {
-					players ! message.slots.Register(this, client, area)
-				}
-				case PlayerId(client, id) => {
-					if (id != resource.Slot.none) area = area.newMob(id, tickCount + 1)
-					clientIds += client -> id
+				case ClientSlot(client, slot) => {
+					if (slot != Slot.none) {
+						val mob = client.spawnMob(slot, area.randomPosition(), area.randomVector(), tickCount + 1)
+						area = area.newMob(mob)
+					}
+					clientSlots += client -> slot
 					fullAreaCode += client -> true
 					startTicker()
-					client ! message.client.PlayerId(id)
+					client ! message.client.ClientSlot(slot)
 				}
 
-				case Leave(client) => {
-					players ! message.slots.Unregister(clientIds(client))
-					clientIds -= client
-					if (clientIds.isEmpty) {
+				case Leave(client, slots) => {
+					slots ! message.slots.Unregister(clientSlots(client))
+					clientSlots -= client
+					if (clientSlots.isEmpty) {
 						stopTicker()
 					}
 				}
 
 				case Command(client, vector) => {
-					area = area.update(clientIds(client), vector)
+					updateMob(clientSlots(client), vector)
 				}
 
 				case FullAreaCode(client) => {
@@ -98,12 +113,15 @@ class Instance(val name: String, private var area: Area) extends Actor {
 					tickCount = count
 					ticker ! message.ticker.WaitTick(this, count + 1)
 
-					area = area.tick(count)
+					gameplay.tick(this, count)
+					area = area.tick(count, gameplay)
 
+					val deadEntites = (for (entity <- area.entities if !entity.alive) yield { entity.slot }).toSet
 					lazy val entitiesCode = Codec.encode(area.entities)
 					lazy val updatedEntitiesCode = Codec.encode(area.updatedEntities(count))
-					for (client <- clientIds.keys) {
-						client ! message.client.Tick(
+					for ((client, slot) <- clientSlots) {
+						if (deadEntites.contains(slot)) client ! message.client.Dead(slot)
+						client ! message.client.Tick(count,
 								if (fullAreaCode.getOrElse(client, false)) {
 									fullAreaCode -= client
 									entitiesCode
@@ -116,41 +134,60 @@ class Instance(val name: String, private var area: Area) extends Actor {
 }
 
 
-class Client(instance: Instance, out: Iteratee[String, Unit]) extends Actor {
+abstract class Client(instance: Instance) extends Actor {
 	start()
-	instance ! message.instance.Enter(this)
+	instance.clientEnter(this, slots)
+
+	def slots: Slots
+
+	def spawnMob(slot: Slot, pos: Position, vector: Vector, tick: Int): Mob
 
 	def act() {
 		import message.client._
 		loop {
 			react {
-				case Command(code) => {
-					instance ! message.instance.Command(this, Codec.decode[Vector](code))
-				}
-				case PlayerId(id: Int) => {
-				}
-				case Stop() => {
-					instance ! message.instance.Leave(this)
-					exit()
-				}
-				case Tick(code) => {
-					out.feed(new Input.El(code))
-				}
+				case Command(code) => command(code)
+				case ClientSlot(slot) => clientSlot(slot)
+				case Dead(slot) => dead(slot)
+				case Stop() => { stop(); exit() }
+				case Tick(count, code) => tick(count, code)
 			}
 		}
+	}
+
+	def command(code :String) {
+		instance ! message.instance.Command(this, Codec.decode[Vector](code))
+	}
+	def clientSlot(slot: Slot) {}
+
+	def dead(slot: Slot) {}
+
+	def stop() {
+		instance.clientLeave(this, slots)
+	}
+
+	def tick(count: Int, code: String) {}
+}
+
+class PlayerClient(instance: Instance, out: Iteratee[String, Unit]) extends Client(instance) {
+	override def slots: Slots = instance.playerSlots
+	override def tick(count: Int, code: String) { out.feed(new Input.El(code)) }
+
+	override def spawnMob(slot: Slot, pos: Position, vector: Vector, tick: Int): Mob = {
+		new Mob(slot, 3, pos, vector, false, tick)
 	}
 }
 
 
-class Slots(allocable: resource.Slot.Range) extends Actor {
-	private val registered = scala.collection.mutable.Set[Int]()
+class Slots(allocable: Slot.Range) extends Actor {
+	private val registered = scala.collection.mutable.Set[Slot]()
 	private val rand = new Random()
 
 	start()
 
-	def allocSlot(entities: Seq[Int]): Int = {
+	private def allocSlot(entities: Seq[Slot]): Slot = {
 		val freeSlots = (allocable.slots -- registered -- entities).toSeq
-		if (freeSlots.isEmpty) resource.Slot.none
+		if (freeSlots.isEmpty) Slot.none
 		else {
 			val slot = freeSlots(rand.nextInt(freeSlots.size))
 			registered += slot
@@ -166,7 +203,7 @@ class Slots(allocable: resource.Slot.Range) extends Actor {
 					exit()
 				}
 				case Register(instance, client, area) => {
-					instance ! message.instance.PlayerId(client, allocSlot(area.entities map { _.id }))
+					instance ! message.instance.ClientSlot(client, allocSlot(area.entities map { _.slot }))
 				}
 				case Unregister(slot) => {
 					registered -= slot

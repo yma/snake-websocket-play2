@@ -8,7 +8,7 @@ KEY =
 	DOWN_ARROW: 40
 
 Item =
-	0:
+	0: # players
 		r: 127
 		g: 127
 		b: 127
@@ -22,6 +22,10 @@ Item =
 		b: 0
 	130: # exploded
 		r: 255
+		g: 0
+		b: 0
+	131: # evilSnake
+		r: 192
 		g: 0
 		b: 0
 

@@ -1,6 +1,8 @@
 package game
 
 import scala.util.Random
+import gameplay._
+import resource._
 
 
 class Vector(val direction: Int) {
@@ -20,6 +22,8 @@ object Vector {
 			Right.direction -> Right,
 			Down.direction -> Down,
 			Left.direction -> Left)
+
+	def random(rand: Random): Vector = Vector.directions(rand.nextInt(4))
 }
 
 
@@ -35,76 +39,81 @@ case class Position(val x: Int, val y: Int) {
 }
 
 
-class Entity(val id: Int, val weight: Int, val pos: Position, val updated: Int) {
+class Entity(val slot: Slot, val weight: Int, val pos: Position, val updated: Int) {
+	val slotCode: Slot = slot
+
 	def alive: Boolean = weight > 0
 
-	def live(tick: Int): Entity = new Entity(id, weight-1, pos, updated)
-	def explode(other: Entity, tick: Int) = new Entity(resource.Slot.Item.exploded, weight + other.weight, pos, tick)
+	def live(tick: Int): Entity = new Entity(slot, weight-1, pos, updated)
+	def explode(other: Entity, tick: Int) = new Entity(Slot.Item.exploded, (weight + other.weight) * 100, pos, tick)
 
-	def tick(count: Int): Entity = if (weight > 1) live(count) else new Entity(resource.Slot.none, 0, pos, count)
+	def tick(count: Int): Entity = if (weight > 1) live(count) else new Entity(slot, 0, pos, count)
 
-	override def toString: String = "E"+ id +"P"+ pos
+	override def toString: String = "E"+ slot +"P"+ pos
 }
 
 
-class Mob(id: Int, weight: Int, pos: Position, val vector: Vector, val eaten: Boolean, updated: Int) extends Entity(id, weight, pos, updated) {
-	def update(v: Vector): Entity = {
+class Mob(slot: Slot, weight: Int, pos: Position, val vector: Vector, val eaten: Boolean, updated: Int) extends Entity(slot, weight, pos, updated) {
+	def respawn(weight: Int, pos: Position, vector: Vector, eaten: Boolean, tick: Int): Mob =
+		new Mob(slot, weight, pos, vector, eaten, tick)
+
+	def update(v: Vector): Mob = {
 		if (v == vector || v == vector.reverse) this
-		else new Mob(id, weight, pos, v, eaten, updated)
+		else respawn(weight, pos, v, eaten, updated)
 	}
 
-	def eat(food: Food) = new Mob(id, weight + food.weight, pos, vector, true, updated)
+	def eat(food: Food) = respawn(weight + food.weight / 13, pos, vector, true, updated)
 
 	def popTail(tick: Int) = if (eaten) {
-		new Entity(resource.Slot.Item.eatenFood, weight, pos, tick)
+		new Entity(Slot.Item.eatenFood, weight, pos, tick)
 	} else {
-		new Entity(id, weight, pos, updated)
+		new Entity(slotCode, weight, pos, updated)
 	}
 
-	override def live(tick: Int): Entity = new Mob(id, weight, pos + vector, vector, false, tick)
+	override def live(tick: Int): Entity = respawn(weight, pos + vector, vector, false, tick)
 
 	override def toString: String = super.toString +"V"+ vector
 }
 
 
-class Food(weight: Int, pos: Position, updated: Int) extends Entity(resource.Slot.Item.food, weight, pos, updated) {
+class Food(weight: Int, pos: Position, updated: Int) extends Entity(Slot.Item.food, weight, pos, updated) {
 	override def live(tick: Int): Entity = new Food(weight-1, pos, updated)
 	def merge(other: Entity) = new Food(weight + other.weight, pos, updated)
 }
 
 
-class Area(val rand: Random, val width: Int, val height: Int, val entities: List[Entity], val updates: Map[Int, Vector]) {
+class Area(val rand: Random, val width: Int, val height: Int, val entities: List[Entity], val updates: Map[Slot, Vector]) {
 	def this(rand: Random, width: Int, height: Int) = this(rand, width, height, Nil, Map())
-	def this(width: Int, height: Int) = this(new Random(), width, height, Nil, Map())
+	def this(width: Int, height: Int) = this(new Random(), width, height)
 
 
 	def randomPosition(): Position = new Position(rand.nextInt(width), rand.nextInt(height))
-	def randomVector(): Vector = Vector.directions(rand.nextInt(4))
+	def randomVector(): Vector = Vector.random(rand)
 
 	def inside(pos: Position): Boolean = pos.x >= 0 && pos.x < width && pos.y >= 0 && pos.y < height
 
-	def update(id: Int, v: Vector): Area = new Area(rand, width, height, entities, updates + (id -> v))
+	def update(slot: Slot, v: Vector): Area = new Area(rand, width, height, entities, updates + (slot -> v))
 
 	def updatedEntities(tick: Int): List[Entity] = entities filter { _.updated == tick }
 
-	def newMob(id: Int, tick: Int): Area = {
-		assert(entities.filter(_.id == id).isEmpty)
-		new Area(rand, width, height, new Mob(id, 3, randomPosition(), randomVector(), false, tick) :: entities, updates)
+	def newMob(mob: Mob): Area = {
+		assert(entities.filter(_.slot == mob.slot).isEmpty)
+		new Area(rand, width, height, mob :: entities, updates)
 	}
 
 
-	def tick(tick: Int): Area = {
+	def tick(count: Int, gameplay: Gameplay): Area = {
 		var nextEntities = entities
-		nextEntities = advance(tick, nextEntities)
-		nextEntities = gameplay(tick, nextEntities)
-		nextEntities = collision(tick, nextEntities)
+		nextEntities = advance(count, nextEntities)
+		nextEntities = gameplay.events(this, count, nextEntities)
+		nextEntities = collision(count, nextEntities)
 		new Area(rand, width, height, nextEntities, Map())
 	}
 
 	def advance(tick: Int, entities: List[Entity]): List[Entity] = {
 		def snakeTails = for (e <- entities if e.isInstanceOf[Mob]) yield e.asInstanceOf[Mob].popTail(tick)
 		def applyUpdate(entity: Entity) = entity match {
-			case mob: Mob => updates.get(mob.id) map { mob.update(_) } getOrElse mob
+			case mob: Mob => updates.get(mob.slot) map { mob.update(_) } getOrElse mob
 			case e => e
 		}
 
@@ -115,18 +124,15 @@ class Area(val rand: Random, val width: Int, val height: Int, val entities: List
 		} yield nextTickEntity
 	}
 
-	def gameplay(tick: Int, entities: List[Entity]): List[Entity] = {
-		if (rand.nextInt(33) == 0) new Food(10 + rand.nextInt(40), randomPosition(), tick) :: entities
-		else entities
-	}
-
 	def collision(tick: Int, entities: List[Entity]): List[Entity] = {
 		def crash(entity: Entity, list: List[Entity]): Entity = entity match {
 			case e:Mob => list match {
 				case Nil => e
-				case (mob:Mob) :: tail => if (mob.id == e.id) crash(e, tail) else e.explode(mob, tick)
+				case (mob:Mob) :: tail if mob.slot == e.slot => crash(e, tail)
+				case (mob:Mob) :: tail => e.explode(mob, tick)
 				case (food:Food) :: tail => crash(e.eat(food), tail)
-				case other :: tail => if (other.alive) e.explode(other, tick) else crash(e, tail)
+				case other :: tail if other.alive => e.explode(other, tick)
+				case other :: tail => crash(e, tail)
 			}
 			case e:Food => list match {
 				case Nil => e
@@ -137,7 +143,8 @@ class Area(val rand: Random, val width: Int, val height: Int, val entities: List
 				case Nil => e
 				case (mob:Mob) :: tail => crash(mob, e :: tail)
 				case (food:Food) :: tail => crash(e, tail)
-				case other :: tail => if (other.alive) e.explode(other, tick) else crash(e, tail)
+				case other :: tail if other.alive => e.explode(other, tick)
+				case other :: tail => crash(e, tail)
 			}
 		}
 
@@ -148,7 +155,6 @@ class Area(val rand: Random, val width: Int, val height: Int, val entities: List
 				case entity: Entity => entity
 			}
 		}
-
-		(for (group <- entities.groupBy(_.pos).values) yield reduce(group)).toList
+		entities.groupBy(_.pos).values.map(reduce(_)).toList
 	}
 }
