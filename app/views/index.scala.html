@@ -5,12 +5,12 @@
 	var snakeGameWebsocket = "@{ "ws://"+ host + routes.MultiplayerSnakeGame.client() }";
 </script>
 
-<script src="@routes.Assets.at("javascripts/snake-game/game-multiplayer.js")" type="text/javascript""></script>
+<script src="@routes.Assets.at("javascripts/snake-game/game-multiplayer.js")" type="text/javascript"></script>
 <link href='http://fonts.googleapis.com/css?family=Gruppo' rel='stylesheet' type='text/css'>
 
 	<section class="gameWrapper">
 		<header>
-			<h1>Snake Game</h1>
+			<h1>Snake Multiplayer</h1>
 		</header>
 
 		<aside class="left">
@@ -26,12 +26,35 @@
 		</aside>
 
 		<aside class="right">
-			<div class="score">0</div>
+			<div id="players">
+				<div class="player">
+					<div class="square" style="background-color: #e44;"></div>
+					<span class="name">Player1</span>
+					<span class="score">123</span>
+				</div>
+
+				<div class="player">
+					<div class="square" style="background-color: #4c4;"></div>
+					<span class="name">Player2</span>
+					<span class="score">12</span>
+				</div>
+
+			</div>
 		</aside>
 
 		<div class="credits">
-			This game was made to try CoffeeScript.
-			 Have a look at the <a href="https://github.com/sylvainmathieu/snake-game/blob/master/public/javascripts/snake-game/game-multiplayer.coffee">source code</a>.
+			This is a Play 2.0 experiment with Scala and Websockets.
+		</div>
+	</section>
+
+	<section id="nameModal">
+		<div class="background"></div>
+		<div class="modal">
+			<h1>Please enter your nickname</h1>
+			<form>
+				<input type="text" value="Player1" />
+				<button type="submit" class="button">Start</button>
+			</form>
 		</div>
 	</section>
 
