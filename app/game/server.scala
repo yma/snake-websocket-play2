@@ -17,6 +17,7 @@ package message {
 		case class ClientSlot(client: Client, slot: Slot)
 		case class FullAreaCode(client: Client)
 		case class Leave(client: Client)
+		case class Spawn(client: Client)
 		case class Tick(ticker: Ticker, count: Int)
 	}
 
@@ -79,15 +80,18 @@ class Instance(val name: String, private var area: Area, gameplay: Gameplay) ext
 		loop {
 			react {
 				case ClientSlot(client, slot) => {
-					if (slot != Slot.none) {
-						val mob = client.spawnMob(slot, area.randomPosition(), area.randomVector(), tickCount + 1)
-						assert(area.entities.filter(_.slot == mob.slot).isEmpty)
-						area = area.update(mob :: area.entities)
-					}
 					clientSlots += client -> slot
 					fullAreaCode += client -> true
 					startTicker()
 					client ! message.client.ClientSlot(slot)
+				}
+
+				case Spawn(client) => {
+					val slot = clientSlots(client)
+					if (slot != Slot.none && area.entities.filter(_.slot == slot).isEmpty) {
+						val mob = client.spawnMob(slot, area.randomPosition(), area.randomVector(), tickCount + 1)
+						area = area.update(mob :: area.entities)
+					}
 				}
 
 				case Leave(client) => {
@@ -163,7 +167,9 @@ abstract class Client(instance: Instance) extends Actor {
 	}
 
 	def command(code :String) {
-		instance ! message.instance.Command(this, Codec.decode[Vector](code))
+		import message.instance._
+		if (code.size == 1 && Codec.decode(code(0)) == 254) instance ! Spawn(this)
+		else instance ! Command(this, Codec.decode[Vector](code))
 	}
 
 	def clientSlot(slot: Slot) {}

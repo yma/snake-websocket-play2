@@ -32,6 +32,8 @@ class EvilClient(instance: Instance) extends Client(instance) {
 	private val rand = new Random()
 	override def slots: Slots = instance.gameplaySlots
 
+	override def clientSlot(slot: Slot) { instance ! message.instance.Spawn(this) }
+
 	override def dead(entity: Entity) { this ! 'stop }
 
 	override def tick(count: Int, code: String) {

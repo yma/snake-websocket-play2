@@ -32,7 +32,6 @@ Item =
 rgb = (item) -> "rgb(" + item.r + "," + item.g + "," + item.b + ")"
 rgba = (item, alpha) -> "rgba(" + item.r + "," + item.g + "," + item.b + ", " + alpha + ")"
 
-gameCodecBase = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz-+"
 gameCodecEncode = (num) ->
 	if num < 0 || num >= 255
 		alert("Can't encode "+ num +" ("+ size +")")
@@ -111,4 +110,5 @@ $ ->
 
 	$("#nameModal form").submit ->
 		$("#nameModal").hide()
+		server.command(254)
 		return false
