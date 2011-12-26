@@ -10,6 +10,7 @@ import game.server._
 class EvilAngelSnake extends BasicSnake {
 	override def tick(instance: Instance, area: Area, count: Int): Area = {
 		if (area.rand.nextInt(50) == 0) new EvilClient(instance)
+		if (area.rand.nextInt(100) == 0) new AngelClient(instance)
 		super.tick(instance, area, count)
 	}
 
@@ -17,16 +18,7 @@ class EvilAngelSnake extends BasicSnake {
 		new Entity(Slot.Item.exploded, (entity.weight + other.weight) * 100, entity.pos, tick)
 }
 
-
-class EvilMob(slot: Slot, weight: Int, pos: Position, vector: Vector, eaten: Boolean, updated: Int) extends Mob(slot, weight, pos, vector, eaten, updated) {
-	override val slotCode: Slot = Slot.Item.evilSnake
-
-	override def respawn(weight: Int, pos: Position, vector: Vector, eaten: Boolean, tick: Int): Mob =
-		new EvilMob(slot, weight, pos, vector, eaten, tick)
-}
-
-
-class EvilClient(instance: Instance) extends Client(instance) {
+abstract class ClientAutopilot(instance: Instance) extends Client(instance) {
 	private val rand = new Random()
 	override def slots: Slots = instance.gameplaySlots
 
@@ -39,8 +31,34 @@ class EvilClient(instance: Instance) extends Client(instance) {
 			instance ! message.instance.Command(this, Vector.random(rand))
 		}
 	}
+}
 
+
+class EvilMob(slot: Slot, weight: Int, pos: Position, vector: Vector, eaten: Boolean, updated: Int) extends Mob(slot, weight, pos, vector, eaten, updated) {
+	override val slotCode: Slot = Slot.Item.evilSnake
+
+	override def respawn(weight: Int, pos: Position, vector: Vector, eaten: Boolean, tick: Int): Mob =
+		new EvilMob(slot, weight, pos, vector, eaten, tick)
+}
+
+class EvilClient(instance: Instance) extends ClientAutopilot(instance) {
 	override def spawnMob(slot: Slot, pos: Position, vector: Vector, tick: Int): Mob = {
 		new EvilMob(slot, 10, pos, vector, false, tick)
+	}
+}
+
+
+class AngelMob(slot: Slot, weight: Int, pos: Position, vector: Vector, eaten: Boolean, updated: Int) extends Mob(slot, weight, pos, vector, eaten, updated) {
+	override val slotCode: Slot = Slot.Item.eatenFood
+
+	override def respawn(weight: Int, pos: Position, vector: Vector, eaten: Boolean, tick: Int): Mob =
+		new AngelMob(slot, weight, pos, vector, eaten, tick)
+
+	override def popTail(tick: Int): Entity = new Food(weight, pos, tick)
+}
+
+class AngelClient(instance: Instance) extends ClientAutopilot(instance) {
+	override def spawnMob(slot: Slot, pos: Position, vector: Vector, tick: Int): Mob = {
+		new AngelMob(slot, 5, pos, vector, false, tick)
 	}
 }

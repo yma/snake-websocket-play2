@@ -40,7 +40,7 @@ class Mob(slot: Slot, weight: Int, pos: Position, val vector: Vector, val eaten:
 		else respawn(weight, pos, v, eaten, updated)
 	}
 
-	def popTail(tick: Int) = if (eaten) {
+	def popTail(tick: Int): Entity = if (eaten) {
 		new Entity(Slot.Item.eatenFood, weight, pos, tick)
 	} else {
 		new Entity(slotCode, weight, pos, updated)
