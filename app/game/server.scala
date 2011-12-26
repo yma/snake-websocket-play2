@@ -29,7 +29,7 @@ package message {
 	}
 
 	package slots {
-		case class Register(instance: Instance, client: Client, area: Area)
+		case class Register(instance: Instance, client: Client, area: Area, player: Boolean)
 		case class Unregister(slot: Slot)
 	}
 }
@@ -67,8 +67,8 @@ class Instance(val name: String, private var area: Area, gameplay: Gameplay) ext
 		area = area.update(mobSlot, vector)
 	}
 
-	def clientEnter(client: Client) {
-		client.slots ! message.slots.Register(this, client, area)
+	def clientEnter(client: Client, player: Boolean) {
+		client.slots ! message.slots.Register(this, client, area, player)
 	}
 
 	def clientLeave(client: Client) {
@@ -145,11 +145,11 @@ class Instance(val name: String, private var area: Area, gameplay: Gameplay) ext
 }
 
 
-abstract class Client(instance: Instance) extends Actor {
+abstract class Client(instance: Instance, player: Boolean) extends Actor {
 	def slots: Slots
 
 	start()
-	instance.clientEnter(this)
+	instance.clientEnter(this, player)
 
 	def spawnMob(slot: Slot, pos: Position, vector: Vector, tick: Int): Mob
 
@@ -159,7 +159,7 @@ abstract class Client(instance: Instance) extends Actor {
 			react {
 				case Command(code) => command(code)
 				case ClientSlot(slot) => clientSlot(slot)
-				case Dead(entity: Entity) => dead(entity)
+				case Dead(entity) => dead(entity)
 				case Tick(count, code) => tick(count, code)
 				case 'stop => { stop(); exit }
 			}
@@ -183,7 +183,7 @@ abstract class Client(instance: Instance) extends Actor {
 	def tick(count: Int, code: String) {}
 }
 
-class PlayerClient(instance: Instance, out: Iteratee[String, Unit]) extends Client(instance) {
+class PlayerClient(instance: Instance, player: Boolean, out: Iteratee[String, Unit]) extends Client(instance, player) {
 	override def slots: Slots = instance.playerSlots
 	override def tick(count: Int, code: String) { out.feed(new Input.El(code)) }
 
@@ -213,8 +213,9 @@ class Slots(allocable: Slot.Range) extends Actor {
 		import message.slots._
 		loop {
 			react {
-				case Register(instance, client, area) => {
-					instance ! message.instance.ClientSlot(client, allocSlot(area.entities map { _.slot }))
+				case Register(instance, client, area, player) => {
+					instance ! message.instance.ClientSlot(client,
+							if (player) allocSlot(area.entities map { _.slot }) else Slot.none)
 				}
 				case Unregister(slot) => {
 					registered -= slot

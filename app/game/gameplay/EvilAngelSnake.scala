@@ -18,7 +18,7 @@ class EvilAngelSnake extends BasicSnake {
 		new Entity(Slot.Item.exploded, (entity.weight + other.weight) * 20, entity.pos, tick)
 }
 
-abstract class ClientAutopilot(instance: Instance) extends Client(instance) {
+abstract class ClientAutopilot(instance: Instance) extends Client(instance, true) {
 	private val rand = new Random()
 	override def slots: Slots = instance.gameplaySlots
 

@@ -2,7 +2,8 @@
 @main("Snake multiplayer") {
 
 <script type="text/javascript">
-	var snakeGameWebsocket = "@{ "ws://"+ host + routes.MultiplayerSnakeGame.client() }";
+	var snakeGameWebsocketViewer = "@{ "ws://"+ host + routes.MultiplayerSnakeGame.client("") }";
+	var snakeGameWebsocketPlayer = "@{ "ws://"+ host + routes.MultiplayerSnakeGame.client("true") }";
 </script>
 
 <script src="@routes.Assets.at("javascripts/snake-game/game-multiplayer.js")" type="text/javascript"></script>
@@ -18,11 +19,15 @@
 				<div class="inner">
 					Game over, your score is <span class="finalScore"></span>
 					<div class="restart">
-						<a href="javascript:;"><span><span>Restart</a>
+						<a href="javascript:;">Restart</a>
 					</div>
 				</div>
 			</div>
 			<canvas id="game" width="400" height="400"></canvas>
+
+			<form id="play">
+				<button type="submit" class="button">Play!</button>
+			</form>
 		</aside>
 
 		<aside class="right">

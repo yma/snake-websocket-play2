@@ -72,9 +72,11 @@ tick = (gameCode) ->
 		else
 			eraseBlock entity.pos
 
-connectServer = (f) ->
-	ws = new WebSocket(snakeGameWebsocket)
-	ws.onopen = (e) -> f()
+connectServer = (url, f) ->
+	ws = new WebSocket(url)
+	ws.onopen = (e) ->
+		$(".gameOver").hide()
+		f()
 	ws.onclose = (e) ->
 		$(".gameOver .inner").text("La connexion au serveur a été fermé")
 		$(".gameOver").show()
@@ -82,6 +84,7 @@ connectServer = (f) ->
 	ws.onerror = (e) -> alert("error: "+ e.data)
 
 	command: (vector) -> ws.send(gameCodecEncode(vector))
+	close: -> ws.close()
 
 init = ->
 	map = (0 for y in [0..(gridSize - 1)] for x in [0..(gridSize - 1)])
@@ -94,7 +97,8 @@ init = ->
 	ctx.fillRect 0, 0, gridSize * 10, gridSize * 10
 
 $ ->
-	server = connectServer ->
+	$("#nameModal").hide()
+	server = connectServer snakeGameWebsocketViewer, ->
 		init()
 
 	$(document).keydown (event) ->
@@ -107,6 +111,13 @@ $ ->
 	$(".restart a").click ->
 		init()
 		$(".gameOver").hide()
+
+	$("#play").submit ->
+		server.close()
+		server = connectServer snakeGameWebsocketPlayer, ->
+			init()
+			$("#nameModal").show()
+		return false
 
 	$("#nameModal form").submit ->
 		$("#nameModal").hide()
