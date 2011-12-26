@@ -6,7 +6,7 @@ import play.api.libs._
 import play.api.libs.iteratee._
 import play.api.libs.concurrent._
 
-import game.gameplay.BasicSnake
+import game.gameplay._
 import game.server.Instance
 
 object MultiplayerSnakeGame extends Controller {
@@ -15,7 +15,7 @@ object MultiplayerSnakeGame extends Controller {
 		Ok(views.html.index(request.headers("Host")))
 	}
 
-	val MainInstance = new Instance("main", new game.Area(40, 40), new BasicSnake())
+	val MainInstance = new Instance("main", new game.Area(40, 40), new EvilAngelSnake())
 
 	def client() = WebSocket[String] { request => (in, out) =>
 		Logger.debug("connection")

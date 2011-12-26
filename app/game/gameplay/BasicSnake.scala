@@ -7,46 +7,28 @@ import game.resource._
 import game.server._
 
 
-class BasicSnake extends Gameplay {
-	private val rand = new Random()
-
-	override def tick(instance: Instance, count: Int) {
-		if (rand.nextInt(50) == 0) new EvilClient(instance)
-	}
-
+class BasicSnake extends BasicGameplay {
 	override def events(area: Area, tick: Int, entities: List[Entity]): List[Entity] = {
-		var nextEntities = entities
-		if (area.rand.nextInt(33) == 0) {
-			nextEntities = new Food(20 + area.rand.nextInt(80), area.randomPosition(), tick) :: entities
-		}
-		nextEntities
+		if (area.rand.nextInt(25) == 0) {
+			new Food(20 + area.rand.nextInt(80), area.randomPosition(), tick) :: entities
+		} else entities
 	}
-}
 
-
-class EvilMob(slot: Slot, weight: Int, pos: Position, vector: Vector, eaten: Boolean, updated: Int) extends Mob(slot, weight, pos, vector, eaten, updated) {
-	override val slotCode: Slot = Slot.Item.evilSnake
-
-	override def respawn(weight: Int, pos: Position, vector: Vector, eaten: Boolean, tick: Int): Mob =
-		new EvilMob(slot, weight, pos, vector, eaten, tick)
-
-	override def live(tick: Int): Entity = respawn(weight, pos + vector, vector, false, tick)
-}
-
-
-class EvilClient(instance: Instance) extends Client(instance) {
-	private val rand = new Random()
-	override def slots: Slots = instance.gameplaySlots
-
-	override def dead(entity: Entity) { this ! 'stop }
-
-	override def tick(count: Int, code: String) {
-		if (rand.nextInt(3) == 0) {
-			instance ! message.instance.Command(this, Vector.random(rand))
+	override def crash(area: Area, tick: Int, entity: Entity, other: Entity): (Symbol, Entity) = {
+		(entity, other) match {
+			case (e: Mob, o: Food) => ('continue, eat(e, o))
+			case (e: Food, o: Mob) => ('continue, eat(o, e))
+			case (e: Food, o: Food) => ('continue, merge(e, o))
+			case (e, o) => super.crash(area, tick, entity, other)
 		}
 	}
 
-	override def spawnMob(slot: Slot, pos: Position, vector: Vector, tick: Int): Mob = {
-		new EvilMob(slot, 10, pos, vector, false, tick)
-	}
+	def eat(mob: Mob, food: Food) = mob.respawn(mob.weight + 1, mob.pos, mob.vector, true, mob.updated)
+
+	def merge(food: Food, other: Food) = new Food(food.weight + other.weight, food.pos, food.updated)
+}
+
+
+class Food(weight: Int, pos: Position, updated: Int) extends Entity(Slot.Item.food, weight, pos, updated) {
+	override def live(tick: Int): Entity = new Food(weight-1, pos, updated)
 }

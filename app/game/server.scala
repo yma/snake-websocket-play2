@@ -81,7 +81,8 @@ class Instance(val name: String, private var area: Area, gameplay: Gameplay) ext
 				case ClientSlot(client, slot) => {
 					if (slot != Slot.none) {
 						val mob = client.spawnMob(slot, area.randomPosition(), area.randomVector(), tickCount + 1)
-						area = area.newMob(mob)
+						assert(area.entities.filter(_.slot == mob.slot).isEmpty)
+						area = area.update(mob :: area.entities)
 					}
 					clientSlots += client -> slot
 					fullAreaCode += client -> true
@@ -110,8 +111,7 @@ class Instance(val name: String, private var area: Area, gameplay: Gameplay) ext
 
 					val beforeEntities = area.entities
 
-					gameplay.tick(this, count)
-					area = area.tick(count, gameplay)
+					area = gameplay.tick(this, area, count)
 
 					val afterEntities = area.entities
 					val clientSlotsSnapshot = clientSlots.toMap
