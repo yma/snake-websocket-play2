@@ -33,7 +33,7 @@ rgb = (item) -> "rgb(" + item.r + "," + item.g + "," + item.b + ")"
 rgba = (item, alpha) -> "rgba(" + item.r + "," + item.g + "," + item.b + ", " + alpha + ")"
 
 gameCodecEncode = (num) ->
-	if num < 0 || num >= 255
+	if num < 0
 		alert("Can't encode "+ num +" ("+ size +")")
 	String.fromCharCode(num + 1)
 
@@ -72,7 +72,23 @@ tick = (gameCode) ->
 		else
 			eraseBlock entity.pos
 
-connectServer = (url, f) ->
+resetNames = ->
+	$("#players").html("")
+
+newName = (slot, name) ->
+	block = """
+		<div id="player-slot-${slot}" class="player">
+			<div class="square" style="background-color: #e44;"></div>
+			<span class="name">${name}</span>
+			<span class="score">0</span>
+		</div>
+		""".replace("${slot}", slot).replace("${name}", name)
+	$("#players").append(block)
+
+removeName = (slot) ->
+	$("#player-slot-" + slot).remove()
+
+connectServer = (url, f, enter) ->
 	ws = new WebSocket(url)
 	ws.onopen = (e) ->
 		$(".gameOver").hide()
@@ -80,9 +96,24 @@ connectServer = (url, f) ->
 	ws.onclose = (e) ->
 		$(".gameOver .inner").text("La connexion au serveur a été fermé")
 		$(".gameOver").show()
-	ws.onmessage = (e) -> tick(e.data)
+	ws.onmessage = (e) ->
+		if e.data
+			code = gameCodecDecode(e.data[0])
+			if code == 200
+				slot = gameCodecDecode(e.data[1])
+				if slot == 0
+					if e.data.length > 2
+						removeName(gameCodecDecode(e.data[2]))
+					else resetNames()
+				else newName(slot, e.data.substring(2))
+			else if code == 201
+				slot = gameCodecDecode(e.data[1])
+				enter(slot)
+			else
+				tick(e.data)
 	ws.onerror = (e) -> alert("error: "+ e.data)
 
+	spawn: (name) -> ws.send(gameCodecEncode(250) + name)
 	command: (vector) -> ws.send(gameCodecEncode(vector))
 	close: -> ws.close()
 
@@ -98,8 +129,7 @@ init = ->
 
 $ ->
 	$("#nameModal").hide()
-	server = connectServer snakeGameWebsocketViewer, ->
-		init()
+	server = connectServer snakeGameWebsocketViewer, init, ->
 
 	$(document).keydown (event) ->
 		switch event.keyCode
@@ -114,12 +144,13 @@ $ ->
 
 	$("#play").submit ->
 		server.close()
-		server = connectServer snakeGameWebsocketPlayer, ->
-			init()
+		server = connectServer snakeGameWebsocketPlayer, init, (slot) ->
 			$("#nameModal").show()
+			$("#nameModal form input[type=text]").val("Player" + slot).focus()
 		return false
 
 	$("#nameModal form").submit ->
+		name = $("#nameModal form input[type=text]").val()
 		$("#nameModal").hide()
-		server.command(254)
+		server.spawn(name)
 		return false

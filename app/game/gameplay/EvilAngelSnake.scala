@@ -28,7 +28,7 @@ abstract class ClientAutopilot(instance: Instance) extends Client(instance, true
 
 	override def tick(count: Int, code: String) {
 		if (rand.nextInt(3) == 0) {
-			instance ! message.instance.Command(this, Vector.random(rand))
+			instance ! message.instance.ChangeVector(this, Vector.random(rand))
 		}
 	}
 }

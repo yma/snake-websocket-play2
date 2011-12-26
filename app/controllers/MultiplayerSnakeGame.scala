@@ -18,13 +18,11 @@ object MultiplayerSnakeGame extends Controller {
 	val MainInstance = new Instance("main", new game.Area(40, 40), new EvilAngelSnake())
 
 	def client(player: String) = WebSocket[String] { request => (in, out) =>
-		Logger.debug("connection")
 		import game.server.message.client._
 		val client = new game.server.PlayerClient(MainInstance, player != "", out);
 
 		out <<: in.map {
 			case Input.EOF => {
-				Logger.info("disconnected")
 				client ! 'stop
 				Input.EOF
 			}

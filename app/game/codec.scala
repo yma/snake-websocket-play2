@@ -2,15 +2,17 @@ package game
 
 package object codec {
 
+	import resource.Slot
+
 	object Codec {
 		def encode(num: Int): Char = {
-			assert(num >= 0 && num < 255)
+			assert(num >= 0)
 			(num + 1).toChar
 		}
 
 		def decode(code: Char): Int = {
 			val num = code.toInt
-			assert(num > 0 && num <= 255)
+			assert(num > 0)
 			num - 1
 		}
 
@@ -28,6 +30,15 @@ package object codec {
 			val chunkSize: Int
 			def encode(element: T): String
 			def decode(code: String): T
+		}
+	}
+
+	implicit object SlotCoder extends Codec.Coder[Slot] {
+		override val chunkSize: Int = 1
+		override def encode(slot: Slot): String = Codec.encode(slot.value).toString
+		override def decode(code: String): Slot = {
+			assert(code.length == chunkSize)
+			Slot(Codec.decode(code(0)))
 		}
 	}
 
