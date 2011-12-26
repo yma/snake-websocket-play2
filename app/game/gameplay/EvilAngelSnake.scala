@@ -9,13 +9,13 @@ import game.server._
 
 class EvilAngelSnake extends BasicSnake {
 	override def tick(instance: Instance, area: Area, count: Int): Area = {
-		if (area.rand.nextInt(50) == 0) new EvilClient(instance)
-		if (area.rand.nextInt(100) == 0) new AngelClient(instance)
+		if (area.rand.nextInt(400) == 0) new EvilClient(instance)
+		if (area.rand.nextInt(400) == 0) new AngelClient(instance)
 		super.tick(instance, area, count)
 	}
 
 	override def explode(entity: Entity, other: Entity, tick: Int) =
-		new Entity(Slot.Item.exploded, (entity.weight + other.weight) * 100, entity.pos, tick)
+		new Entity(Slot.Item.exploded, (entity.weight + other.weight) * 20, entity.pos, tick)
 }
 
 abstract class ClientAutopilot(instance: Instance) extends Client(instance) {
@@ -54,7 +54,7 @@ class AngelMob(slot: Slot, weight: Int, pos: Position, vector: Vector, eaten: Bo
 	override def respawn(weight: Int, pos: Position, vector: Vector, eaten: Boolean, tick: Int): Mob =
 		new AngelMob(slot, weight, pos, vector, eaten, tick)
 
-	override def popTail(tick: Int): Entity = new Food(weight, pos, tick)
+	override def popTail(tick: Int): Entity = if (eaten) super.popTail(tick) else new Food(weight, pos, tick)
 }
 
 class AngelClient(instance: Instance) extends ClientAutopilot(instance) {

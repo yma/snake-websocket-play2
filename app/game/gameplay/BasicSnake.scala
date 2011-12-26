@@ -14,11 +14,13 @@ class BasicSnake extends BasicGameplay {
 		} else entities
 	}
 
-	override def crash(area: Area, tick: Int, entity: Entity, other: Entity): (Symbol, Entity) = {
+	override def crash(area: Area, tick: Int, entity: Entity, other: Entity): Entity = {
 		(entity, other) match {
-			case (e: Mob, o: Food) => ('continue, eat(e, o))
-			case (e: Food, o: Mob) => ('continue, eat(o, e))
-			case (e: Food, o: Food) => ('continue, merge(e, o))
+			case (e: Mob, o: Food) => eat(e, o)
+			case (e: Food, o: Mob) => eat(o, e)
+			case (e: Food, o: Food) => merge(e, o)
+			case (e: Food, o) => o
+			case (e, o: Food) => e
 			case (e, o) => super.crash(area, tick, entity, other)
 		}
 	}

@@ -17,10 +17,10 @@ class BasicGameplay() extends Gameplay {
 			yield area.clip(applyUpdate(entity).tick(tick), tick)
 	}
 
-	override def crash(area: Area, tick: Int, entity: Entity, other: Entity): (Symbol, Entity) = {
+	override def crash(area: Area, tick: Int, entity: Entity, other: Entity): Entity = {
 		(entity, other) match {
-			case (e: Mob, o: Mob) if e.slot == o.slot => ('continue, e)
-			case (e, o) => ('stop, explode(e, o, tick))
+			case (e: Mob, o: Mob) if e.slot == o.slot => e
+			case (e, o) => explode(e, o, tick)
 		}
 	}
 

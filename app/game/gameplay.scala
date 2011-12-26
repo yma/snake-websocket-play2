@@ -24,13 +24,7 @@ abstract class Gameplay() {
 			case other :: tail => {
 				if (!entity.alive) reduce(other, tail)
 				else if (!other.alive) reduce(entity, tail)
-				else {
-					val (r, e) = crash(area, tick, entity, other)
-					r match {
-						case 'continue => reduce(e, tail)
-						case 'stop => e
-					}
-				}
+				else reduce(crash(area, tick, entity, other), tail)
 			}
 		}
 
@@ -45,6 +39,6 @@ abstract class Gameplay() {
 		entities.groupBy(_.pos).values.map(reduceGroup(_)).toList
 	}
 
-	def crash(area: Area, tick: Int, entity: Entity, other: Entity): (Symbol, Entity)
+	def crash(area: Area, tick: Int, entity: Entity, other: Entity): Entity
 
 }
