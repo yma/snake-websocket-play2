@@ -118,6 +118,7 @@ class Instance(val name: String, private var area: Area, gameplay: Gameplay) ext
 					if (clientSlots.isEmpty) {
 						stopTicker()
 					}
+					area = area.update(area.entities filterNot { e => e.slot == slot && e.isInstanceOf[Mob] })
 				}
 
 				case ChangeVector(client, vector) => {
