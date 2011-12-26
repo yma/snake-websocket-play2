@@ -42,6 +42,9 @@ case class Position(val x: Int, val y: Int) {
 class Entity(val slot: Slot, val weight: Int, val pos: Position, val updated: Int) {
 	val slotCode: Slot = slot
 
+	def respawn(weight: Int, pos: Position, tick: Int): Entity =
+		new Entity(slot, weight, pos, tick)
+
 	def alive: Boolean = weight > 0
 
 	def live(tick: Int): Entity = new Entity(slot, weight-1, pos, updated)
@@ -61,6 +64,18 @@ class Area(val rand: Random, val width: Int, val height: Int, val entities: List
 	def randomVector(): Vector = Vector.random(rand)
 
 	def inside(pos: Position): Boolean = pos.x >= 0 && pos.x < width && pos.y >= 0 && pos.y < height
+
+	def clip(pos: Position): Position = {
+		val x = if (pos.x < 0) pos.x + width else if (pos.x >= width) pos.x - width else pos.x
+		val y = if (pos.y < 0) pos.y + height else if (pos.y >= height) pos.y - height else pos.y
+		Position(x, y)
+	}
+
+	def clip(entity: Entity, tick: Int): Entity = {
+		val pos = clip(entity.pos)
+		if (pos == entity.pos) entity
+		else entity.respawn(entity.weight, pos, tick)
+	}
 
 	def updatedEntities(tick: Int): List[Entity] = entities filter { _.updated == tick }
 

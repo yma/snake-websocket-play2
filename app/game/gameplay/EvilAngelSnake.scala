@@ -23,8 +23,6 @@ class EvilMob(slot: Slot, weight: Int, pos: Position, vector: Vector, eaten: Boo
 
 	override def respawn(weight: Int, pos: Position, vector: Vector, eaten: Boolean, tick: Int): Mob =
 		new EvilMob(slot, weight, pos, vector, eaten, tick)
-
-	override def live(tick: Int): Entity = respawn(weight, pos + vector, vector, false, tick)
 }
 
 

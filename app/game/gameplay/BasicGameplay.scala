@@ -13,11 +13,8 @@ class BasicGameplay() extends Gameplay {
 			case e => e
 		}
 
-		for {
-			entity <- entities ::: snakeTails if entity.alive
-			val nextTickEntity = applyUpdate(entity).tick(tick)
-			if area.inside(nextTickEntity.pos)
-		} yield nextTickEntity
+		for (entity <- entities ::: snakeTails if entity.alive)
+			yield area.clip(applyUpdate(entity).tick(tick), tick)
 	}
 
 	override def crash(area: Area, tick: Int, entity: Entity, other: Entity): (Symbol, Entity) = {
@@ -33,6 +30,8 @@ class BasicGameplay() extends Gameplay {
 
 
 class Mob(slot: Slot, weight: Int, pos: Position, val vector: Vector, val eaten: Boolean, updated: Int) extends Entity(slot, weight, pos, updated) {
+	override def respawn(weight: Int, pos: Position, tick: Int): Entity = respawn(weight, pos, vector, eaten, tick)
+
 	def respawn(weight: Int, pos: Position, vector: Vector, eaten: Boolean, tick: Int): Mob =
 		new Mob(slot, weight, pos, vector, eaten, tick)
 
