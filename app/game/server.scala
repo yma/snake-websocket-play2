@@ -68,6 +68,10 @@ class Instance(val name: String, private var area: Area, gameplay: Gameplay) ext
 		}
 	}
 
+	private def notifyClients(message: Any) {
+		for (client <- clientSlots.keys) client ! message
+	}
+
 	def updateMob(mobSlot: Slot, vector: Vector) {
 		area = area.update(mobSlot, vector)
 	}
@@ -93,12 +97,7 @@ class Instance(val name: String, private var area: Area, gameplay: Gameplay) ext
 
 				case Name(client, name) => {
 					clientNames += client -> name
-					val clientSlotsSnapshot = clientSlots.toMap
-					actor {
-						val slot = clientSlotsSnapshot(client)
-						for (other <- clientSlotsSnapshot.keys)
-							other ! message.client.UpdateName(slot, name)
-					}
+					notifyClients(message.client.UpdateName(clientSlots(client), name))
 				}
 
 				case Spawn(client) => {
@@ -113,7 +112,7 @@ class Instance(val name: String, private var area: Area, gameplay: Gameplay) ext
 					val slot = clientSlots(client)
 					area = gameplay.leave(this, area, tickCount + 1, slot)
 
-					client ! message.client.RemoveName(slot)
+					notifyClients(message.client.RemoveName(slot))
 					client.slots ! message.slots.Unregister(slot)
 					clientSlots -= client
 					clientNames -= client
