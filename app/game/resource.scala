@@ -7,6 +7,7 @@ object Slot {
 	val none = Slot(0)
 	val name = Slot(200)
 	val playerSlot = Slot(201)
+	val score = Slot(202)
 
 	class Range(start: Int, end: Int) {
 		val slots = start.until(end).map(Slot(_)).toSet

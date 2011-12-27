@@ -64,7 +64,9 @@ tick = (gameCode) ->
 	while gameCode != ""
 		entity = decodeEntity gameCode
 		gameCode = gameCode.substring(3)
-		if entity.id != 0
+		if entity.id == 202
+			updateScore(entity.pos.x, entity.pos.y)
+		else if entity.id != 0
 			item = Item[entity.id]
 			if item == undefined
 				item = Item[0]
@@ -87,6 +89,9 @@ newName = (slot, name) ->
 
 removeName = (slot) ->
 	$("#player-slot-" + slot).remove()
+
+updateScore = (slot, score) ->
+	$("#player-slot-" + slot + " .score").text(score)
 
 connectServer = (url, f, enter) ->
 	ws = new WebSocket(url)

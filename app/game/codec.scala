@@ -2,6 +2,7 @@ package game
 
 package object codec {
 
+	import gameplay.Mob
 	import resource.Slot
 
 	object Codec {
@@ -64,9 +65,13 @@ package object codec {
 
 		override val chunkSize: Int = 1 + PositionCoder.chunkSize
 
-		override def encode(entity: Entity): String =
-			Codec.encode((if (entity.alive) entity.slotCode else Slot.none).value) +
-			PositionCoder.encode(entity.pos)
+		override def encode(entity: Entity): String = {
+			var code =
+				Codec.encode((if (entity.alive) entity.slotCode else Slot.none).value) +
+				PositionCoder.encode(entity.pos)
+			if (!entity.isInstanceOf[Mob] || entity.slot != entity.slotCode) code
+			else code + Codec.encode(Slot.score) + Codec.encode(entity.slotCode) + Codec.encode(entity.weight)
+		}
 
 		override def decode(code: String): Entity = {
 			assert(code.length == chunkSize)
