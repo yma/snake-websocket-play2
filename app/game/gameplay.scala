@@ -15,6 +15,8 @@ abstract class Gameplay() {
 		area.nextTick(entities)
 	}
 
+	def leave(instance: Instance, area: Area, tick: Int, slot: Slot): Area = { area }
+
 	def advance(area: Area, tick: Int, entities: List[Entity]): List[Entity] = entities
 	def events(area: Area, tick: Int, entities: List[Entity]): List[Entity] = entities
 
@@ -39,6 +41,6 @@ abstract class Gameplay() {
 		entities.groupBy(_.pos).values.map(reduceGroup(_)).toList
 	}
 
-	def crash(area: Area, tick: Int, entity: Entity, other: Entity): Entity
+	def crash(area: Area, tick: Int, entity: Entity, other: Entity): Entity {}
 
 }

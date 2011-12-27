@@ -45,6 +45,8 @@ class Entity(val slot: Slot, val weight: Int, val pos: Position, val updated: In
 	def respawn(weight: Int, pos: Position, tick: Int): Entity =
 		new Entity(slot, weight, pos, tick)
 
+	def dead(tick: Int): Entity = new Entity(Slot.none, 1, pos, tick)
+
 	def alive: Boolean = weight > 0
 
 	def live(tick: Int): Entity = new Entity(slot, weight-1, pos, updated)
@@ -75,6 +77,10 @@ class Area(val rand: Random, val width: Int, val height: Int, val entities: List
 		val pos = clip(entity.pos)
 		if (pos == entity.pos) entity
 		else entity.respawn(entity.weight, pos, tick)
+	}
+
+	def kill(list: Set[Entity], tick: Int): Area = {
+		update(entities map { e => if (list.contains(e)) e.dead(tick) else e })
 	}
 
 	def updatedEntities(tick: Int): List[Entity] = entities filter { _.updated == tick }

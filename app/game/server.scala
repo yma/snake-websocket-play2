@@ -111,6 +111,8 @@ class Instance(val name: String, private var area: Area, gameplay: Gameplay) ext
 
 				case Leave(client) => {
 					val slot = clientSlots(client)
+					area = gameplay.leave(this, area, tickCount + 1, slot)
+
 					client ! message.client.RemoveName(slot)
 					client.slots ! message.slots.Unregister(slot)
 					clientSlots -= client
@@ -118,7 +120,6 @@ class Instance(val name: String, private var area: Area, gameplay: Gameplay) ext
 					if (clientSlots.isEmpty) {
 						stopTicker()
 					}
-					area = area.update(area.entities filterNot { e => e.slot == slot && e.isInstanceOf[Mob] })
 				}
 
 				case ChangeVector(client, vector) => {

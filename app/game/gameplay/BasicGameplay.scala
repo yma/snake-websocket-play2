@@ -6,6 +6,10 @@ import game.server._
 
 
 class BasicGameplay() extends Gameplay {
+	override def leave(instance: Instance, area: Area, tick: Int, slot: Slot): Area = {
+		area.kill(area.entities.filter { e => e.slot == slot && e.isInstanceOf[Mob] }.toSet, tick)
+	}
+
 	override def advance(area: Area, tick: Int, entities: List[Entity]): List[Entity] = {
 		def snakeTails = for (e <- entities if e.isInstanceOf[Mob]) yield e.asInstanceOf[Mob].popTail(tick)
 		def applyUpdate(entity: Entity) = entity match {
