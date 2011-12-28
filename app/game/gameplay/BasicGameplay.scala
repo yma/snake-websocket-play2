@@ -7,7 +7,7 @@ import game.server._
 
 class BasicGameplay() extends Gameplay {
 	override def leave(instance: Instance, area: Area, tickCount: Int, slot: Slot): Area = {
-		area.kill(area.entities.filter { e => e.slot == slot && e.isInstanceOf[Mob] }.toSet, tickCount)
+		area.kill(area.entities.filter { e => e.slotCode == slot && e.isInstanceOf[Mob] }.toSet, tickCount)
 	}
 
 	override def advance(area: Area, tickCount: Int, entities: List[Entity]): List[Entity] = {
@@ -16,7 +16,7 @@ class BasicGameplay() extends Gameplay {
 			area.updates.get(entity.slot).map(_(entity)).getOrElse(entity)
 		}
 
-		for (entity <- entities ::: snakeTails if entity.alive || entity.tickCount == tickCount)
+		for (entity <- entities ::: snakeTails if entity.alive || entity.tickCount >= tickCount)
 			yield area.clip(applyUpdate(entity).tick(tickCount), tickCount)
 	}
 
