@@ -13,9 +13,9 @@ import scala.util.Random
 
 package message {
 	package instance {
-		case class ClientSlot(client: Client, slot: Slot)
-		case class FullAreaCode(client: Client)
+		case class Enter(client: Client, slot: Slot)
 		case class Leave(client: Client)
+		case class FullAreaCode(client: Client)
 		case class Name(client: Client, name: String)
 		case class Spawn(client: Client)
 		case class Tick(ticker: Ticker, count: Int)
@@ -84,9 +84,10 @@ class Instance(val name: String, private var area: Area, gameplay: Gameplay) ext
 		import message.instance._
 		loop {
 			react {
-				case ClientSlot(client, slot) => {
+				case Enter(client, slot) => {
 					clientSlots += client -> slot
 					fullAreaCode += client -> true
+					area = gameplay.enter(this, area, tickCount + 1, slot)
 					startTicker()
 					client ! message.client.ClientSlot(slot)
 				}
@@ -142,8 +143,8 @@ class Instance(val name: String, private var area: Area, gameplay: Gameplay) ext
 							client ! message.client.Dead(beforeMobs(slot))
 					}
 
-					lazy val entitiesCode = Codec.encode(area.entities)
-					lazy val updatedEntitiesCode = Codec.encode(area.updatedEntities(count))
+					lazy val entitiesCode = Codec.encode(area.entities ++ gameplay.elements)
+					lazy val updatedEntitiesCode = Codec.encode(area.entitiesAt(count) ++ gameplay.elementsAt(count))
 					lazy val namesSnapshot = clientNames.map { case (c, n) => clientSlots(c) -> n }.toMap
 					for ((client, slot) <- clientSlots) {
 						if (fullAreaCode.getOrElse(client, false)) {
@@ -282,7 +283,7 @@ class Slots(allocable: Slot.Range) extends Actor {
 		loop {
 			react {
 				case Register(instance, client, area, player) => {
-					instance ! message.instance.ClientSlot(client,
+					instance ! message.instance.Enter(client,
 							if (player) allocSlot(area.entities.map(_.slot)) else Slot.none)
 				}
 				case Unregister(slot) => {

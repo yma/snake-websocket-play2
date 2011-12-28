@@ -7,6 +7,12 @@ import game.server._
 
 abstract class Gameplay() {
 
+	def elements: Seq[Element] = Nil
+	def elementsAt(tickCount: Int): Seq[Element] = elements filter { _.tickCount == tickCount }
+
+	def enter(instance: Instance, area: Area, tickCount: Int, slot: Slot): Area = { area }
+	def leave(instance: Instance, area: Area, tickCount: Int, slot: Slot): Area = { area }
+
 	def tick(instance: Instance, area: Area, tickCount: Int): Area = {
 		var entities = area.entities
 		entities = advance(area, tickCount, entities)
@@ -14,8 +20,6 @@ abstract class Gameplay() {
 		entities = collision(area, tickCount, entities)
 		area.nextTick(entities)
 	}
-
-	def leave(instance: Instance, area: Area, tickCount: Int, slot: Slot): Area = { area }
 
 	def advance(area: Area, tickCount: Int, entities: List[Entity]): List[Entity] = entities
 	def events(area: Area, tickCount: Int, entities: List[Entity]): List[Entity] = entities

@@ -39,15 +39,19 @@ case class Position(x: Int, y: Int) {
 }
 
 
-class Entity(val slot: Slot, val slotCode: Slot, val weight: Int, val pos: Position, val tick: Int) {
-	def this(slot: Slot, weight: Int, pos: Position, tick: Int) = this(slot, slot, weight, pos, tick)
+class Element(val slot: Slot, val tickCount: Int)
+
+
+class Entity(slot: Slot, val slotCode: Slot, val weight: Int, val pos: Position, tickCount: Int)
+extends Element(slot, tickCount) {
+	def this(slot: Slot, weight: Int, pos: Position, tickCount: Int) = this(slot, slot, weight, pos, tickCount)
 	val alive: Boolean = weight > 0
 
 	def copy(
 			weight: Int = this.weight,
 			pos: Position = this.pos,
-			tick: Int = this.tick) =
-		new Entity(slot, weight, pos, tick)
+			tickCount: Int = this.tickCount) =
+		new Entity(slot, weight, pos, tickCount)
 
 
 	def dead(tickCount: Int): Entity =
@@ -60,6 +64,11 @@ class Entity(val slot: Slot, val slotCode: Slot, val weight: Int, val pos: Posit
 		if (weight > 1) live(tickCount) else dead(tickCount)
 
 	override def toString: String = "E"+ slot +"P"+ pos
+}
+
+
+class Score(slot: Slot, val value: Int, tickCount: Int) extends Element(slot, tickCount) {
+	def add(value: Int, tickCount: Int): Score = new Score(slot, this.value + value, tickCount)
 }
 
 
@@ -95,14 +104,13 @@ class Area(
 	def clip(entity: Entity, tickCount: Int): Entity = {
 		val pos = clip(entity.pos)
 		if (pos == entity.pos) entity
-		else entity.copy(pos = pos, tick = tickCount)
+		else entity.copy(pos = pos, tickCount = tickCount)
 	}
 
 	def kill(list: Set[Entity], tickCount: Int): Area =
 		copy(entities = entities map { e => if (list.contains(e)) e.dead(tickCount) else e })
 
-	def updatedEntities(tickCount: Int): List[Entity] =
-		entities filter { _.tick == tickCount }
+	def entitiesAt(tickCount: Int): List[Entity] = entities filter { _.tickCount == tickCount }
 
 	def nextTick(entities: List[Entity]): Area = {
 		new Area(rand, width, height, entities, Map())

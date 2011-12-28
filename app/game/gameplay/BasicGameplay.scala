@@ -16,7 +16,7 @@ class BasicGameplay() extends Gameplay {
 			area.updates.get(entity.slot).map(_(entity)).getOrElse(entity)
 		}
 
-		for (entity <- entities ::: snakeTails if entity.alive || entity.tick == tickCount)
+		for (entity <- entities ::: snakeTails if entity.alive || entity.tickCount == tickCount)
 			yield area.clip(applyUpdate(entity).tick(tickCount), tickCount)
 	}
 
@@ -32,17 +32,17 @@ class BasicGameplay() extends Gameplay {
 }
 
 
-class Mob(slot: Slot, slotCode: Slot, weight: Int, pos: Position, val vector: Vector, val eaten: Boolean, tick: Int)
-extends Entity(slot, slotCode, weight, pos, tick) {
-	override def copy(weight: Int, pos: Position, tick: Int) = copy2(weight, pos, vector, eaten, tick)
+class Mob(slot: Slot, slotCode: Slot, weight: Int, pos: Position, val vector: Vector, val eaten: Boolean, tickCount: Int)
+extends Entity(slot, slotCode, weight, pos, tickCount) {
+	override def copy(weight: Int, pos: Position, tickCount: Int) = copy2(weight, pos, vector, eaten, tickCount)
 
 	def copy2(
 			weight: Int = this.weight,
 			pos: Position = this.pos,
 			vector: Vector = this.vector,
 			eaten: Boolean = this.eaten,
-			tick: Int = this.tick) =
-		new Mob(slot, slotCode, weight, pos, vector, eaten, tick)
+			tickCount: Int = this.tickCount) =
+		new Mob(slot, slotCode, weight, pos, vector, eaten, tickCount)
 
 	def update(v: Vector): Mob = {
 		if (v == vector || v == vector.reverse) this
@@ -52,11 +52,11 @@ extends Entity(slot, slotCode, weight, pos, tick) {
 	def popTail(tickCount: Int): Entity = if (eaten) {
 		new Entity(Slot.Item.eatenFood, weight, pos, tickCount)
 	} else {
-		new Entity(slotCode, weight, pos, tick)
+		new Entity(slotCode, weight, pos, this.tickCount)
 	}
 
 	override def live(tickCount: Int): Entity =
-		copy2(pos = pos + vector, eaten = false, tick = tickCount)
+		copy2(pos = pos + vector, eaten = false, tickCount = tickCount)
 
 	override def toString: String = super.toString +"V"+ vector
 }

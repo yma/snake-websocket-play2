@@ -65,18 +65,41 @@ package object codec {
 
 		override val chunkSize: Int = 1 + PositionCoder.chunkSize
 
-		override def encode(entity: Entity): String = {
-			var code =
-				Codec.encode((if (entity.alive) entity.slotCode else Slot.none).value) +
-				PositionCoder.encode(entity.pos)
-			if (entity.getClass != classOf[Mob]) code
-			else code + Codec.encode(Slot.score) + Codec.encode(entity.slotCode) + Codec.encode(entity.weight)
-		}
+		override def encode(entity: Entity): String =
+			Codec.encode((if (entity.alive) entity.slotCode else Slot.none).value) +
+			PositionCoder.encode(entity.pos)
 
 		override def decode(code: String): Entity = {
 			assert(code.length == chunkSize)
 			throw new RuntimeException()
 		}
+	}
+
+	implicit object ScoreCoder extends Codec.Coder[Score] {
+		import resource._
+
+		override val chunkSize: Int = 3
+
+		override def encode(score: Score): String =
+			Codec.encode(Slot.score) + Codec.encode(score.slot) + Codec.encode(score.value)
+
+		override def decode(code: String): Score = {
+			assert(code.length == chunkSize)
+			throw new RuntimeException()
+		}
+	}
+
+	implicit object ElementCoder extends Codec.Coder[Element] {
+		import resource._
+
+		override val chunkSize: Int = 0
+
+		override def encode(element: Element): String = element match {
+			case e: Entity => Codec.encode(e)
+			case e: Score => Codec.encode(e)
+		}
+
+		override def decode(code: String): Score = throw new RuntimeException()
 	}
 
 }

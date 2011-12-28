@@ -45,8 +45,8 @@ abstract class ClientAutopilot(instance: Instance, clientSlot: Slot) extends Cli
 
 class EvilMob(slot: Slot, slotCode: Slot, weight: Int, pos: Position, vector: Vector, eaten: Boolean, updated: Int)
 extends Mob(slot, slotCode, weight, pos, vector, eaten, updated) {
-	override def copy2(weight: Int, pos: Position, vector: Vector, eaten: Boolean, tick: Int) =
-		new EvilMob(slot, slotCode, weight, pos, vector, eaten, tick)
+	override def copy2(weight: Int, pos: Position, vector: Vector, eaten: Boolean, tickCount: Int) =
+		new EvilMob(slot, slotCode, weight, pos, vector, eaten, tickCount)
 }
 
 class EvilClient(instance: Instance) extends ClientAutopilot(instance, Slot.Item.evilSnake) {
@@ -57,8 +57,8 @@ class EvilClient(instance: Instance) extends ClientAutopilot(instance, Slot.Item
 
 class AngelMob(slot: Slot, slotCode: Slot, weight: Int, pos: Position, vector: Vector, eaten: Boolean, updated: Int)
 extends Mob(slot, slotCode, weight, pos, vector, eaten, updated) {
-	override def copy2(weight: Int, pos: Position, vector: Vector, eaten: Boolean, tick: Int) =
-		new AngelMob(slot, slotCode, weight, pos, vector, eaten, tick)
+	override def copy2(weight: Int, pos: Position, vector: Vector, eaten: Boolean, tickCount: Int) =
+		new AngelMob(slot, slotCode, weight, pos, vector, eaten, tickCount)
 
 	override def popTail(tickCount: Int): Entity =
 		if (eaten) super.popTail(tickCount) else new Food(weight, pos, tickCount)
