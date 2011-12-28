@@ -13,13 +13,13 @@ import scala.util.Random
 
 package message {
 	package instance {
-		case class ChangeVector(client: Client, vector: Vector)
 		case class ClientSlot(client: Client, slot: Slot)
 		case class FullAreaCode(client: Client)
 		case class Leave(client: Client)
 		case class Name(client: Client, name: String)
 		case class Spawn(client: Client)
 		case class Tick(ticker: Ticker, count: Int)
+		case class UpdateEntity(slot: Slot, f: (Entity) => Entity)
 	}
 
 	package client {
@@ -72,10 +72,6 @@ class Instance(val name: String, private var area: Area, gameplay: Gameplay) ext
 		for (client <- clientSlots.keys) client ! message
 	}
 
-	def updateMob(mobSlot: Slot, vector: Vector) {
-		area = area.update(mobSlot, vector)
-	}
-
 	def clientEnter(client: Client, player: Boolean) {
 		client.slots ! message.slots.Register(this, client, area, player)
 	}
@@ -103,8 +99,8 @@ class Instance(val name: String, private var area: Area, gameplay: Gameplay) ext
 				case Spawn(client) => {
 					val slot = clientSlots(client)
 					if (slot != Slot.none && area.entities.filter(_.slot == slot).isEmpty) {
-						val mob = client.spawnMob(slot, area.randomPosition(), area.randomVector(), tickCount + 1)
-						area = area.update(mob :: area.entities)
+						val mob = client.spawnMob(area.randomPosition(), area.randomVector(), tickCount + 1)
+						area = area.copy(entities = mob :: area.entities)
 					}
 				}
 
@@ -116,13 +112,11 @@ class Instance(val name: String, private var area: Area, gameplay: Gameplay) ext
 					client.slots ! message.slots.Unregister(slot)
 					clientSlots -= client
 					clientNames -= client
-					if (clientSlots.isEmpty) {
-						stopTicker()
-					}
+					if (clientSlots.isEmpty) stopTicker()
 				}
 
-				case ChangeVector(client, vector) => {
-					updateMob(clientSlots(client), vector)
+				case UpdateEntity(slot, f) => {
+					area = area.copy(updates = area.updates + (slot -> f))
 				}
 
 				case FullAreaCode(client) => {
@@ -168,12 +162,13 @@ class Instance(val name: String, private var area: Area, gameplay: Gameplay) ext
 
 
 abstract class Client(instance: Instance, player: Boolean) extends Actor {
+	protected var slot: Slot = Slot.none
 	def slots: Slots
 
 	start()
 	instance.clientEnter(this, player)
 
-	def spawnMob(slot: Slot, pos: Position, vector: Vector, tick: Int): Mob
+	def spawnMob(pos: Position, vector: Vector, tickCount: Int): Mob
 
 	def act() {
 		import message.client._
@@ -193,7 +188,7 @@ abstract class Client(instance: Instance, player: Boolean) extends Actor {
 
 	def command(code :String) {}
 
-	def clientSlot(slot: Slot) {}
+	def clientSlot(slot: Slot) { this.slot = slot }
 
 	def dead(entity: Entity) {}
 
@@ -205,36 +200,41 @@ abstract class Client(instance: Instance, player: Boolean) extends Actor {
 		instance.clientLeave(this)
 	}
 
-	def tick(count: Int, code: String) {}
+	def tick(tickCount: Int, code: String) {}
 }
 
-class PlayerClient(instance: Instance, player: Boolean, out: Iteratee[String, Unit]) extends Client(instance, player) {
-	private var playerSlot: Slot = Slot.none
+class PlayerClient(instance: Instance, player: Boolean, out: Iteratee[String, Unit])
+extends Client(instance, player) {
+	protected var mobSlot: Slot = Slot.none
 	override def slots: Slots = instance.playerSlots
 
-	override def spawnMob(slot: Slot, pos: Position, vector: Vector, tick: Int): Mob = {
-		new Mob(slot, 3, pos, vector, false, tick)
+	override def spawnMob(pos: Position, vector: Vector, tickCount: Int): Mob = {
+		new Mob(mobSlot, slot, 3, pos, vector, false, tickCount)
 	}
 
 	override def command(code :String) {
+		super.command(code)
 		import message.instance._
 		Codec.decode(code(0)) match {
 			case 250 => {
 				instance ! Name(this, code.substring(1))
 				instance ! Spawn(this)
 			}
-			case vector => instance ! ChangeVector(this, Vector.directions(vector))
+			case vector =>
+				instance ! UpdateEntity(mobSlot, _.asInstanceOf[Mob].update(Vector.directions(vector)))
 		}
 	}
 
 	override def clientSlot(slot: Slot) {
-		playerSlot = slot
+		super.clientSlot(slot)
 		if (slot != Slot.none) {
+			mobSlot = Slot.Mob.from(Slot.Players, slot)
 			out.feed(new Input.El(Codec.encode(Slot.playerSlot) + Codec.encode(slot)))
-		}
+		} else mobSlot = Slot.none
 	}
 
 	override def updateNames(names: Map[Slot, String]) {
+		super.updateNames(names)
 		actor {
 			this ! message.client.UpdateName(Slot.none, "") // reset all name
 			for ((slot, name) <- names) {
@@ -245,14 +245,17 @@ class PlayerClient(instance: Instance, player: Boolean, out: Iteratee[String, Un
 	}
 
 	override def updateName(slot: Slot, name: String) {
+		super.updateName(slot, name)
 		out.feed(new Input.El(Codec.encode(Slot.name) + Codec.encode(slot) + name))
 	}
 
 	override def removeName(slot: Slot) {
+		super.removeName(slot)
 		out.feed(new Input.El(Codec.encode(Slot.name) + Codec.encode(Slot.none) + Codec.encode(slot)))
 	}
 
-	override def tick(count: Int, code: String) {
+	override def tick(tickCount: Int, code: String) {
+		super.tick(tickCount, code)
 		out.feed(new Input.El(code))
 	}
 }
@@ -280,7 +283,7 @@ class Slots(allocable: Slot.Range) extends Actor {
 			react {
 				case Register(instance, client, area, player) => {
 					instance ! message.instance.ClientSlot(client,
-							if (player) allocSlot(area.entities map { _.slot }) else Slot.none)
+							if (player) allocSlot(area.entities.map(_.slot)) else Slot.none)
 				}
 				case Unregister(slot) => {
 					registered -= slot

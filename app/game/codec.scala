@@ -69,13 +69,13 @@ package object codec {
 			var code =
 				Codec.encode((if (entity.alive) entity.slotCode else Slot.none).value) +
 				PositionCoder.encode(entity.pos)
-			if (!entity.isInstanceOf[Mob] || entity.slot != entity.slotCode) code
+			if (entity.getClass != classOf[Mob]) code
 			else code + Codec.encode(Slot.score) + Codec.encode(entity.slotCode) + Codec.encode(entity.weight)
 		}
 
 		override def decode(code: String): Entity = {
 			assert(code.length == chunkSize)
-			new Entity(Slot(Codec.decode(code(0))), 0, PositionCoder.decode(code.substring(1)), 0)
+			throw new RuntimeException()
 		}
 	}
 
