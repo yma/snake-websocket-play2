@@ -1,5 +1,6 @@
 ctx = map = null
 gridSize = 40
+scores = {}
 
 KEY =
 	LEFT_ARROW: 37
@@ -78,19 +79,27 @@ resetNames = ->
 	$("#players").html("")
 
 newName = (slot, name) ->
+	score = scores[slot]
+	if score == undefined
+		score = "?"
 	block = """
 		<div id="player-slot-${slot}" class="player">
 			<div class="square" style="background-color: #e44;"></div>
 			<span class="name">${name}</span>
-			<span class="score">0</span>
+			<span class="score">${score}</span>
 		</div>
-		""".replace("${slot}", slot).replace("${name}", name)
+		"""
+		.replace("${slot}", slot)
+		.replace("${name}", name)
+		.replace("${score}", score)
 	$("#players").append(block)
 
 removeName = (slot) ->
 	$("#player-slot-" + slot).remove()
+	delete scores[slot]
 
 updateScore = (slot, score) ->
+	scores[slot] = score
 	$("#player-slot-" + slot + " .score").text(score)
 
 updateStats = (viewers, players) ->
