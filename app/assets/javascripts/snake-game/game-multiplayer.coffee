@@ -93,6 +93,10 @@ removeName = (slot) ->
 updateScore = (slot, score) ->
 	$("#player-slot-" + slot + " .score").text(score)
 
+updateStats = (viewers, players) ->
+	$("#stats .viewers").text(viewers)
+	$("#stats .players").text(players)
+
 connectServer = (url, f, enter) ->
 	ws = new WebSocket(url)
 	ws.onopen = (e) ->
@@ -104,16 +108,18 @@ connectServer = (url, f, enter) ->
 	ws.onmessage = (e) ->
 		if e.data
 			code = gameCodecDecode(e.data[0])
-			if code == 200
+			if code == 200 # name
 				slot = gameCodecDecode(e.data[1])
 				if slot == 0
 					if e.data.length > 2
 						removeName(gameCodecDecode(e.data[2]))
 					else resetNames()
 				else newName(slot, e.data.substring(2))
-			else if code == 201
+			else if code == 201 # player slot
 				slot = gameCodecDecode(e.data[1])
 				enter(slot)
+			else if code == 203 # stats
+				updateStats(gameCodecDecode(e.data[1]), gameCodecDecode(e.data[2]))
 			else
 				tick(e.data)
 	ws.onerror = (e) -> alert("error: "+ e.data)

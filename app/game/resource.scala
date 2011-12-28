@@ -8,17 +8,21 @@ object Slot {
 	val name = Slot(200)
 	val playerSlot = Slot(201)
 	val score = Slot(202)
+	val stats = Slot(203)
 
 	class Range(start: Int, end: Int) {
 		lazy val slots = start.until(end).map(Slot(_)).toSet
 
+		def contains(index: Int) = index >= 0 && index < end - start
+		def contains(slot: Slot) = slot.value >= start && slot.value < end
+
 		def slot(index: Int) = {
-			assert(index >= 0 && index < end - start)
+			assert(contains(index))
 			Slot(start + index)
 		}
 
 		def index(slot: Slot) = {
-			assert(slot.value >= start && slot.value < end)
+			assert(contains(slot))
 			slot.value - start
 		}
 

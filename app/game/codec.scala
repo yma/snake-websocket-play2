@@ -4,6 +4,7 @@ package object codec {
 
 	import gameplay.Mob
 	import resource.Slot
+	import server.Statistics
 
 	object Codec {
 		def encode(num: Int): Char = {
@@ -100,6 +101,20 @@ package object codec {
 		}
 
 		override def decode(code: String): Score = throw new RuntimeException()
+	}
+
+	implicit object StatisticsCoder extends Codec.Coder[Statistics] {
+		import resource._
+
+		override val chunkSize: Int = 3
+
+		override def encode(stats: Statistics): String =
+			Codec.encode(Slot.stats) + Codec.encode(stats.viewers) + Codec.encode(stats.players)
+
+		override def decode(code: String): Statistics = {
+			assert(code.length == chunkSize)
+			throw new RuntimeException()
+		}
 	}
 
 }

@@ -30,11 +30,26 @@ package message {
 		case class UpdateNames(names: Map[Slot, String])
 		case class UpdateName(slot: Slot, name: String)
 		case class RemoveName(slot: Slot)
+		case class UpdateStats(stats: Statistics)
 	}
 
 	package slots {
 		case class Register(instance: Instance, client: Client, area: Area, player: Boolean)
 		case class Unregister(slot: Slot)
+	}
+}
+
+
+class Statistics(val viewers: Int, val players: Int) {
+	def update(action: Symbol, slot: Slot) = {
+		if (slot == Slot.none || Slot.Players.contains(slot)) {
+			val value = action match {
+				case 'enter => 1
+				case 'leave => -1
+			}
+			if (slot == Slot.none) new Statistics(viewers + value, players)
+			else new Statistics(viewers, players + value)
+		} else this
 	}
 }
 
@@ -49,6 +64,8 @@ class Instance(val name: String, private var area: Area, gameplay: Gameplay) ext
 	private val clientSlots = scala.collection.mutable.Map[Client, Slot]()
 	private val clientNames = scala.collection.mutable.Map[Client, String]()
 	private val fullAreaCode = scala.collection.mutable.Map[Client, Boolean]()
+
+	private var stats: Statistics = new Statistics(0, 0)
 
 	start()
 
@@ -88,8 +105,10 @@ class Instance(val name: String, private var area: Area, gameplay: Gameplay) ext
 					clientSlots += client -> slot
 					fullAreaCode += client -> true
 					area = gameplay.enter(this, area, tickCount + 1, slot)
+					stats = stats.update('enter, slot)
 					startTicker()
 					client ! message.client.ClientSlot(slot)
+					notifyClients(message.client.UpdateStats(stats))
 				}
 
 				case Name(client, name) => {
@@ -108,8 +127,10 @@ class Instance(val name: String, private var area: Area, gameplay: Gameplay) ext
 				case Leave(client) => {
 					val slot = clientSlots(client)
 					area = gameplay.leave(this, area, tickCount + 1, slot)
+					stats = stats.update('leave, slot)
 
 					notifyClients(message.client.RemoveName(slot))
+					notifyClients(message.client.UpdateStats(stats))
 					client.slots ! message.slots.Unregister(slot)
 					clientSlots -= client
 					clientNames -= client
@@ -182,6 +203,7 @@ abstract class Client(instance: Instance, player: Boolean) extends Actor {
 				case UpdateNames(names) => updateNames(names)
 				case UpdateName(slot, name) => updateName(slot, name)
 				case RemoveName(slot) => removeName(slot)
+				case UpdateStats(stats) => updateStats(stats)
 				case 'stop => { stop(); exit }
 			}
 		}
@@ -196,6 +218,8 @@ abstract class Client(instance: Instance, player: Boolean) extends Actor {
 	def updateNames(names: Map[Slot, String]) {}
 	def updateName(slot: Slot, name: String) {}
 	def removeName(slot: Slot) {}
+
+	def updateStats(stats: Statistics) {}
 
 	def stop() {
 		instance.clientLeave(this)
@@ -253,6 +277,11 @@ extends Client(instance, player) {
 	override def removeName(slot: Slot) {
 		super.removeName(slot)
 		out.feed(new Input.El(Codec.encode(Slot.name) + Codec.encode(Slot.none) + Codec.encode(slot)))
+	}
+
+	override def updateStats(stats: Statistics) {
+		super.updateStats(stats)
+		out.feed(new Input.El(Codec.encode(stats)))
 	}
 
 	override def tick(tickCount: Int, code: String) {
