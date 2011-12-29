@@ -98,6 +98,10 @@ removeName = (slot) ->
 	$("#player-slot-" + slot).remove()
 	delete scores[slot]
 
+deadPlayer = (slot) ->
+	$("#player-slot-" + slot).addClass("dead")
+	delete scores[slot]
+
 updateScore = (slot, score) ->
 	scores[slot] = score
 	$("#player-slot-" + slot + " .score").text(score)
@@ -127,6 +131,9 @@ connectServer = (url, f, enter) ->
 				enter(slot)
 			else if code == 98 # player leave
 				removeName(gameCodecDecode(e.data[1]))
+			else if code == 99 # players dead
+				for ch in e.data.substring(1)
+					deadPlayer(gameCodecDecode(ch))
 			else if code == 101 # stats
 				updateStats(gameCodecDecode(e.data[1]), gameCodecDecode(e.data[2]))
 			else

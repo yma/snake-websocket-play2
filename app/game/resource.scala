@@ -44,6 +44,7 @@ object Slot {
 		val name = slot(0)
 		val playerEnter = slot(1)
 		val playerLeave = slot(2)
+		val playerDead  = slot(3)
 		val score = slot(4)
 		val stats = slot(5)
 

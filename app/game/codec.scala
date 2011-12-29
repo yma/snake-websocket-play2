@@ -19,7 +19,7 @@ package object codec {
 		}
 
 		def encode[T](element: T)(implicit coder: Coder[T]): String = coder.encode(element)
-		def encode[T](elements: List[T])(implicit coder: Coder[T]): String = {
+		def encode[T](elements: Iterable[T])(implicit coder: Coder[T]): String = {
 			elements.foldLeft("")(_ + encode(_))
 		}
 
@@ -125,6 +125,11 @@ package object codec {
 	object PlayerLeaveCode {
 		def apply(slot: Slot): String =
 			Codec.encode(Slot.Command.playerLeave) + Codec.encode(slot)
+	}
+
+	object PlayerDeadCode {
+		def apply(slots: Iterable[Slot]): String =
+			Codec.encode(Slot.Command.playerDead) + Codec.encode(slots)
 	}
 
 	object ResetNamesCode {
