@@ -13,19 +13,19 @@ Item =
 		r: 127
 		g: 127
 		b: 127
-	128: # food
+	64: # food
 		r: 0
 		g: 127
 		b: 0
-	129: # eatenFood
+	65: # eatenFood
 		r: 0
 		g: 192
 		b: 0
-	130: # exploded
+	66: # exploded
 		r: 255
 		g: 0
 		b: 0
-	131: # evilSnake
+	67: # evilSnake
 		r: 192
 		g: 0
 		b: 0
@@ -65,7 +65,7 @@ tick = (gameCode) ->
 	while gameCode != ""
 		entity = decodeEntity gameCode
 		gameCode = gameCode.substring(3)
-		if entity.id == 202
+		if entity.id == 100 # score
 			updateScore(entity.pos.x, entity.pos.y)
 		else if entity.id != 0
 			item = Item[entity.id]
@@ -117,24 +117,24 @@ connectServer = (url, f, enter) ->
 	ws.onmessage = (e) ->
 		if e.data
 			code = gameCodecDecode(e.data[0])
-			if code == 200 # name
+			if code == 96 # name
 				slot = gameCodecDecode(e.data[1])
 				if slot == 0
-					if e.data.length > 2
-						removeName(gameCodecDecode(e.data[2]))
-					else resetNames()
+					resetNames()
 				else newName(slot, e.data.substring(2))
-			else if code == 201 # player slot
+			else if code == 97 # player enter
 				slot = gameCodecDecode(e.data[1])
 				enter(slot)
-			else if code == 203 # stats
+			else if code == 98 # player leave
+				removeName(gameCodecDecode(e.data[1]))
+			else if code == 101 # stats
 				updateStats(gameCodecDecode(e.data[1]), gameCodecDecode(e.data[2]))
 			else
 				tick(e.data)
 	ws.onerror = (e) -> alert("error: "+ e.data)
 
-	spawn: (name) -> ws.send(gameCodecEncode(250) + name)
-	command: (vector) -> ws.send(gameCodecEncode(vector))
+	spawn: (name) -> ws.send(gameCodecEncode(96) + name)
+	command: (vector) -> ws.send(gameCodecEncode(102 + vector))
 	close: -> ws.close()
 
 init = ->

@@ -82,7 +82,7 @@ package object codec {
 		override val chunkSize: Int = 3
 
 		override def encode(score: Score): String =
-			Codec.encode(Slot.score) + Codec.encode(score.slot) + Codec.encode(score.value)
+			Codec.encode(Slot.Command.score) + Codec.encode(score.slot) + Codec.encode(score.value)
 
 		override def decode(code: String): Score = {
 			assert(code.length == chunkSize)
@@ -109,11 +109,42 @@ package object codec {
 		override val chunkSize: Int = 3
 
 		override def encode(stats: Statistics): String =
-			Codec.encode(Slot.stats) + Codec.encode(stats.viewers) + Codec.encode(stats.players)
+			Codec.encode(Slot.Command.stats) + Codec.encode(stats.viewers) + Codec.encode(stats.players)
 
 		override def decode(code: String): Statistics = {
 			assert(code.length == chunkSize)
 			throw new RuntimeException()
+		}
+	}
+
+	object PlayerEnterCode {
+		def apply(slot: Slot): String =
+			Codec.encode(Slot.Command.playerEnter) + Codec.encode(slot)
+	}
+
+	object PlayerLeaveCode {
+		def apply(slot: Slot): String =
+			Codec.encode(Slot.Command.playerLeave) + Codec.encode(slot)
+	}
+
+	object ResetNamesCode {
+		def apply(): String =
+			Codec.encode(Slot.Command.name) + Codec.encode(Slot.none)
+	}
+
+	object NameCode {
+		def apply(slot: Slot, name: String): String =
+			Codec.encode(Slot.Command.name) + Codec.encode(slot) + name
+		def unapply(code: String): Option[String] =
+			if (code.length < 1 || Slot(Codec.decode(code(0))) != Slot.Command.name) None
+			else Some(code.substring(1))
+	}
+
+	object VectorCode {
+		def apply(vector: Vector): Slot = Slot(vector.direction)
+		def unapply(code: String): Option[Vector] = {
+			val index = Slot.Command.Vector.index(Codec.decode[Slot](code))
+			if (index < 4) Some(Vector.directions(index)) else None
 		}
 	}
 

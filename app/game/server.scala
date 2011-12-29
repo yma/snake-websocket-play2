@@ -24,12 +24,12 @@ package message {
 
 	package client {
 		case class Command(code: String)
-		case class ClientSlot(slot: Slot)
 		case class Dead(entity: Entity)
+		case class Enter(slot: Slot)
+		case class Leave(slot: Slot)
 		case class Tick(count: Int, code: String)
 		case class UpdateNames(names: Map[Slot, String])
 		case class UpdateName(slot: Slot, name: String)
-		case class RemoveName(slot: Slot)
 		case class UpdateStats(stats: Statistics)
 	}
 
@@ -107,7 +107,7 @@ class Instance(val name: String, private var area: Area, gameplay: Gameplay) ext
 					area = gameplay.enter(this, area, tickCount + 1, slot)
 					stats = stats.update('enter, slot)
 					startTicker()
-					client ! message.client.ClientSlot(slot)
+					client ! message.client.Enter(slot)
 					notifyClients(message.client.UpdateStats(stats))
 				}
 
@@ -129,7 +129,7 @@ class Instance(val name: String, private var area: Area, gameplay: Gameplay) ext
 					area = gameplay.leave(this, area, tickCount + 1, slot)
 					stats = stats.update('leave, slot)
 
-					notifyClients(message.client.RemoveName(slot))
+					notifyClients(message.client.Leave(slot))
 					notifyClients(message.client.UpdateStats(stats))
 					client.slots ! message.slots.Unregister(slot)
 					clientSlots -= client
@@ -197,12 +197,12 @@ abstract class Client(instance: Instance, player: Boolean) extends Actor {
 		loop {
 			react {
 				case Command(code) => command(code)
-				case ClientSlot(slot) => clientSlot(slot)
+				case Enter(slot) => enter(slot)
 				case Dead(entity) => dead(entity)
 				case Tick(count, code) => tick(count, code)
 				case UpdateNames(names) => updateNames(names)
 				case UpdateName(slot, name) => updateName(slot, name)
-				case RemoveName(slot) => removeName(slot)
+				case Leave(slot) => leave(slot)
 				case UpdateStats(stats) => updateStats(stats)
 				case 'stop => { stop(); exit }
 			}
@@ -211,13 +211,13 @@ abstract class Client(instance: Instance, player: Boolean) extends Actor {
 
 	def command(code :String) {}
 
-	def clientSlot(slot: Slot) { this.slot = slot }
+	def enter(slot: Slot) { this.slot = slot }
+	def leave(slot: Slot) {}
 
 	def dead(entity: Entity) {}
 
 	def updateNames(names: Map[Slot, String]) {}
 	def updateName(slot: Slot, name: String) {}
-	def removeName(slot: Slot) {}
 
 	def updateStats(stats: Statistics) {}
 
@@ -233,6 +233,8 @@ extends Client(instance, player) {
 	protected var mobSlot: Slot = Slot.none
 	override def slots: Slots = instance.playerSlots
 
+	private def send(code: String) { out.feed(new Input.El(code)) }
+
 	override def spawnMob(pos: Position, vector: Vector, tickCount: Int): Mob = {
 		new Mob(mobSlot, slot, 3, pos, vector, false, tickCount)
 	}
@@ -240,53 +242,65 @@ extends Client(instance, player) {
 	override def command(code :String) {
 		super.command(code)
 		import message.instance._
-		Codec.decode(code(0)) match {
-			case 250 => {
-				instance ! Name(this, code.substring(1))
+		code match {
+			case VectorCode(vector) =>
+				instance ! UpdateEntity(mobSlot, _.asInstanceOf[Mob].update(vector))
+			case NameCode(name) => {
+				instance ! Name(this, name)
 				instance ! Spawn(this)
 			}
-			case vector =>
-				instance ! UpdateEntity(mobSlot, _.asInstanceOf[Mob].update(Vector.directions(vector)))
 		}
 	}
 
-	override def clientSlot(slot: Slot) {
-		super.clientSlot(slot)
+	override def enter(slot: Slot) {
+		super.enter(slot)
 		if (slot != Slot.none) {
 			mobSlot = Slot.Mob.from(Slot.Players, slot)
-			out.feed(new Input.El(Codec.encode(Slot.playerSlot) + Codec.encode(slot)))
+			send(PlayerEnterCode(slot))
 		} else mobSlot = Slot.none
+	}
+
+	override def leave(slot: Slot) {
+		super.leave(slot)
+		send(PlayerLeaveCode(slot))
+	}
+
+	private val notifyNamesDelayer = actor {
+		loop {
+			react {
+				case ('name, slot: Slot, name: String) => {
+					this ! message.client.UpdateName(slot, name)
+					Thread.sleep(100)
+				}
+				case 'stop => exit
+			}
+		}
 	}
 
 	override def updateNames(names: Map[Slot, String]) {
 		super.updateNames(names)
-		actor {
-			this ! message.client.UpdateName(Slot.none, "") // reset all name
-			for ((slot, name) <- names) {
-				this ! message.client.UpdateName(slot, name)
-				Thread.sleep(250)
-			}
-		}
+		send(ResetNamesCode())
+		for ((slot, name) <- names) notifyNamesDelayer ! ('name, slot, name)
 	}
 
 	override def updateName(slot: Slot, name: String) {
 		super.updateName(slot, name)
-		out.feed(new Input.El(Codec.encode(Slot.name) + Codec.encode(slot) + name))
-	}
-
-	override def removeName(slot: Slot) {
-		super.removeName(slot)
-		out.feed(new Input.El(Codec.encode(Slot.name) + Codec.encode(Slot.none) + Codec.encode(slot)))
+		send(NameCode(slot, name))
 	}
 
 	override def updateStats(stats: Statistics) {
 		super.updateStats(stats)
-		out.feed(new Input.El(Codec.encode(stats)))
+		send(Codec.encode(stats))
 	}
 
 	override def tick(tickCount: Int, code: String) {
 		super.tick(tickCount, code)
-		out.feed(new Input.El(code))
+		send(code)
+	}
+
+	override def stop() {
+		super.stop()
+		notifyNamesDelayer ! 'stop
 	}
 }
 

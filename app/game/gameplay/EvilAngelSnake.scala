@@ -23,8 +23,8 @@ abstract class ClientAutopilot(instance: Instance, clientSlot: Slot) extends Cli
 	protected var internalSlot = Slot.none
 	override def slots: Slots = instance.gameplaySlots
 
-	override def clientSlot(slot: Slot) {
-		super.clientSlot(slot)
+	override def enter(slot: Slot) {
+		super.enter(slot)
 		internalSlot = this.slot
 		this.slot = clientSlot
 		instance ! message.instance.Spawn(this)
