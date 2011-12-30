@@ -6,17 +6,24 @@ import game.server._
 
 
 class BasicSnake extends BasicGameplay {
-	val scores = scala.collection.mutable.Map[Slot, Score]()
+	val players = scala.collection.mutable.Map[Slot, Player]()
 
-	override def elements: Seq[Element] = super.elements ++ scores.values
+	override def elements: Seq[Element] = super.elements ++ players.values
 
 	override def enter(instance: Instance, area: Area, tickCount: Int, slot: Slot): Area = {
-		if (Slot.Players contains slot) scores += slot -> new Score(slot, 0, tickCount)
+		if (Slot.Players contains slot) players += slot -> new Player(slot, 'alive, 0, tickCount)
 		super.enter(instance, area, tickCount, slot)
 	}
 
+	override def death(instance: Instance, area: Area, tickCount: Int, entities: Seq[Entity]): Area = {
+		for (entity <- entities) players.get(entity.slotCode) map { player =>
+			players(entity.slotCode) = player.copy(status = 'dead, tickCount = tickCount)
+		}
+		super.death(instance, area, tickCount, entities)
+	}
+
 	override def leave(instance: Instance, area: Area, tickCount: Int, slot: Slot): Area = {
-		scores -= slot
+		players -= slot
 		super.leave(instance, area, tickCount, slot)
 	}
 
@@ -38,8 +45,8 @@ class BasicSnake extends BasicGameplay {
 	}
 
 	def eat(mob: Mob, food: Food, tickCount: Int): Mob = {
-		scores.get(mob.slotCode) map { score =>
-			scores(mob.slotCode) = score.add(1, tickCount)
+		players.get(mob.slotCode) map { player =>
+			players(mob.slotCode) = player.copy(score = player.score + 1, tickCount = tickCount)
 		}
 		mob.copy2(weight = mob.weight + 1, eaten = true)
 	}

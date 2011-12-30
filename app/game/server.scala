@@ -27,7 +27,6 @@ package message {
 		case class Enter(slot: Slot)
 		case class Dead(entity: Entity)
 
-		case class NotifyDead(slots: Iterable[Slot])
 		case class NotifyLeave(slot: Slot)
 		case class NotifyName(slot: Slot, name: String)
 		case class NotifyNames(names: Map[Slot, String])
@@ -162,17 +161,14 @@ class Instance(val name: String, private var area: Area, gameplay: Gameplay) ext
 					val afterEntities = area.entities
 					val clientSlotsSnapshot = clientSlots.toMap
 
+					val beforeMobs = (for (e <- beforeEntities if e.alive && e.isInstanceOf[Mob]) yield { e.slot -> e }).toMap
+					val afterMobSlots = (for (e <- afterEntities if e.alive && e.isInstanceOf[Mob]) yield { e.slot }).toSet
+					val deadMobSlots = (beforeMobs.keySet -- afterMobSlots).toSet
 					actor {
-						val beforeMobs = (for (e <- beforeEntities if e.alive && e.isInstanceOf[Mob]) yield { e.slot -> e }).toMap
-						val afterMobSlots = (for (e <- afterEntities if e.alive && e.isInstanceOf[Mob]) yield { e.slot -> e }).toMap
-
-						val deadMobSlots = (beforeMobs.keySet -- afterMobSlots.keySet).toSet
 						for ((client, slot) <- clientSlotsSnapshot if deadMobSlots.contains(slot))
 							client ! message.client.Dead(beforeMobs(slot))
-
-						val deadSlots = beforeMobs.values.map(_.slotCode).toSet -- afterMobSlots.values.map(_.slotCode).toSet
-						if (!deadSlots.isEmpty) notifyClients(message.client.NotifyDead(deadSlots))
 					}
+					gameplay.death(this, area, tickCount, beforeEntities.filter(deadMobSlots contains _.slot))
 
 					lazy val entitiesCode = Codec.encode(area.entities ++ gameplay.elements)
 					lazy val updatedEntitiesCode = Codec.encode(area.entitiesAt(count) ++ gameplay.elementsAt(count))
@@ -210,7 +206,6 @@ abstract class Client(instance: Instance, player: Boolean) extends Actor {
 				case Enter(slot) => enter(slot)
 				case Dead(entity) => dead(entity)
 
-				case NotifyDead(slots) => notifyDead(slots)
 				case NotifyLeave(slots) => notifyLeave(slots)
 				case NotifyName(slot, name) => notifyName(slot, name)
 				case NotifyNames(names) => notifyNames(names)
@@ -222,12 +217,11 @@ abstract class Client(instance: Instance, player: Boolean) extends Actor {
 		}
 	}
 
-	def command(code :String) {}
+	def command(code: String) {}
 
 	def enter(slot: Slot) { this.slot = slot }
 	def dead(entity: Entity) {}
 
-	def notifyDead(slots: Iterable[Slot]) {}
 	def notifyLeave(slot: Slot) {}
 	def notifyName(slot: Slot, name: String) {}
 	def notifyNames(names: Map[Slot, String]) {}
@@ -272,23 +266,18 @@ extends Client(instance, player) {
 		} else mobSlot = Slot.none
 	}
 
-	override def notifyDead(slots: Iterable[Slot]) {
-		super.notifyDead(slots)
-		val playerSlots = slots.filter(Slot.Players.contains)
-		if (!playerSlots.isEmpty) send(PlayerDeadCode(playerSlots))
-	}
-
 	override def notifyLeave(slot: Slot) {
 		super.notifyLeave(slot)
 		if (Slot.Players contains slot) send(PlayerLeaveCode(slot))
 	}
 
-	class NotifyNamesDelayer() extends Actor {
+	class NotifyNamesDelayer(client: PlayerClient) extends Actor {
+		start
 		def act() {
 			loop {
 				react {
 					case ('name, slot: Slot, name: String) => {
-						this ! message.client.NotifyName(slot, name)
+						client ! message.client.NotifyName(slot, name)
 						Thread.sleep(100)
 					}
 					case 'stop => exit
@@ -296,7 +285,7 @@ extends Client(instance, player) {
 			}
 		}
 	}
-	private val notifyNamesDelayer = new NotifyNamesDelayer()
+	private val notifyNamesDelayer = new NotifyNamesDelayer(this)
 
 	override def notifyNames(names: Map[Slot, String]) {
 		super.notifyNames(names)

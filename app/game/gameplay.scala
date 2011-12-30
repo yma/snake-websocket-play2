@@ -11,6 +11,7 @@ abstract class Gameplay() {
 	def elementsAt(tickCount: Int): Seq[Element] = elements filter { _.tickCount == tickCount }
 
 	def enter(instance: Instance, area: Area, tickCount: Int, slot: Slot): Area = { area }
+	def death(instance: Instance, area: Area, tickCount: Int, entities: Seq[Entity]): Area = { area }
 	def leave(instance: Instance, area: Area, tickCount: Int, slot: Slot): Area = { area }
 
 	def tick(instance: Instance, area: Area, tickCount: Int): Area = {

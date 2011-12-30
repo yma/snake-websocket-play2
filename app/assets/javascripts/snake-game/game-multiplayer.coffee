@@ -1,6 +1,6 @@
 ctx = map = null
 gridSize = 40
-scores = {}
+players = {}
 
 KEY =
 	LEFT_ARROW: 37
@@ -65,8 +65,8 @@ tick = (gameCode) ->
 	while gameCode != ""
 		entity = decodeEntity gameCode
 		gameCode = gameCode.substring(3)
-		if entity.id == 100 # score
-			updateScore(entity.pos.x, entity.pos.y)
+		if entity.id == 100 # player
+			updatePlayer(entity.pos.x, entity.pos.y)
 		else if entity.id != 0
 			item = Item[entity.id]
 			if item == undefined
@@ -75,36 +75,47 @@ tick = (gameCode) ->
 		else
 			eraseBlock entity.pos
 
-resetNames = ->
+resetPlayers = ->
 	$("#players").html("")
 
-newName = (slot, name) ->
-	score = scores[slot]
-	if score == undefined
-		score = "?"
+newPlayer = (slot, name) ->
 	block = """
 		<div id="player-slot-${slot}" class="player">
 			<div class="square" style="background-color: #e44;"></div>
 			<span class="name">${name}</span>
-			<span class="score">${score}</span>
+			<span class="score">?</span>
 		</div>
 		"""
 		.replace("${slot}", slot)
 		.replace("${name}", name)
-		.replace("${score}", score)
 	$("#players").append(block)
 
-removeName = (slot) ->
+	player = players[slot]
+	if player == undefined
+		player =
+			slot: slot,
+			status: 1,
+			score: "?"
+	updatePlayerDisplay(player)
+
+updatePlayer = (slot, statusScore) ->
+	player = players[slot] =
+		slot: slot,
+		status: statusScore & 1
+		score: (statusScore & ~1) / 2
+	updatePlayerDisplay(player)
+
+updatePlayerDisplay = (player) ->
+	$div = $("#player-slot-" + player.slot)
+	if player.status
+		$div.addClass("dead")
+	else
+		$div.removeClass("dead")
+	$(".score", $div).text(player.score)
+
+removePlayer = (slot) ->
 	$("#player-slot-" + slot).remove()
-	delete scores[slot]
-
-deadPlayer = (slot) ->
-	$("#player-slot-" + slot).addClass("dead")
-	delete scores[slot]
-
-updateScore = (slot, score) ->
-	scores[slot] = score
-	$("#player-slot-" + slot + " .score").text(score)
+	delete players[slot]
 
 updateStats = (viewers, players) ->
 	$("#stats .viewers").text(viewers)
@@ -124,16 +135,14 @@ connectServer = (url, f, enter) ->
 			if code == 96 # name
 				slot = gameCodecDecode(e.data[1])
 				if slot == 0
-					resetNames()
-				else newName(slot, e.data.substring(2))
+					resetPlayers()
+				else
+					newPlayer(slot, e.data.substring(2))
 			else if code == 97 # player enter
 				slot = gameCodecDecode(e.data[1])
 				enter(slot)
 			else if code == 98 # player leave
-				removeName(gameCodecDecode(e.data[1]))
-			else if code == 99 # players dead
-				for ch in e.data.substring(1)
-					deadPlayer(gameCodecDecode(ch))
+				removePlayer(gameCodecDecode(e.data[1]))
 			else if code == 101 # stats
 				updateStats(gameCodecDecode(e.data[1]), gameCodecDecode(e.data[2]))
 			else

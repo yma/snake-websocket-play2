@@ -86,20 +86,27 @@ package object codec {
 		}
 	}
 
-	implicit object ScoreCoder extends Codec.Encoder[Score] {
-		override def encode(score: Score) =
-			if (!Codec.valid(score.value)) None
-			else {
-				val slot = SlotCoder.encode(score.slot)
-				if (slot == None) None
-				else Some(Codec.encode(Slot.Command.score) + slot.get + Codec.encode(score.value))
+	implicit object PlayerCoder extends Codec.Encoder[Player] {
+		override def encode(player: Player) = {
+			val status = player.status match {
+				case 'alive => Some(0)
+				case 'dead => Some(1)
+				case _ => None
 			}
+			val value = status.map(_ + player.score * 2)
+			if (value == None || !Codec.valid(value.get)) None
+			else {
+				val slot = SlotCoder.encode(player.slot)
+				if (slot == None) None
+				else Some(Codec.encode(Slot.Command.player) + slot.get + Codec.encode(value.get))
+			}
+		}
 	}
 
 	implicit object ElementCoder extends Codec.Encoder[Element] {
 		override def encode(element: Element) = element match {
 			case e: Entity => EntityCoder.encode(e)
-			case e: Score => ScoreCoder.encode(e)
+			case e: Player => PlayerCoder.encode(e)
 		}
 	}
 
@@ -117,11 +124,6 @@ package object codec {
 	object PlayerLeaveCode {
 		def apply(slot: Slot): String =
 			Codec.encode(Slot.Command.playerLeave) + Codec.encode(slot)
-	}
-
-	object PlayerDeadCode {
-		def apply(slots: Iterable[Slot]): String =
-			Codec.encode(Slot.Command.playerDead) + Codec.encode(slots)
 	}
 
 	object ResetNamesCode {

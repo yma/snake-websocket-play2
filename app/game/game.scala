@@ -67,8 +67,12 @@ extends Element(slot, tickCount) {
 }
 
 
-class Score(slot: Slot, val value: Int, tickCount: Int) extends Element(slot, tickCount) {
-	def add(value: Int, tickCount: Int): Score = new Score(slot, this.value + value, tickCount)
+class Player(slot: Slot, val status: Symbol, val score: Int, tickCount: Int) extends Element(slot, tickCount) {
+	def copy(
+			status: Symbol = this.status,
+			score: Int = this.score,
+			tickCount: Int = this.tickCount) =
+		new Player(slot, status, score, tickCount)
 }
 
 
