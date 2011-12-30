@@ -1,6 +1,7 @@
 ctx = map = null
 gridSize = 40
 players = {}
+currentSlot = 0
 
 KEY =
 	LEFT_ARROW: 37
@@ -107,6 +108,10 @@ updatePlayer = (slot, statusScore) ->
 
 updatePlayerDisplay = (player) ->
 	$div = $("#player-slot-" + player.slot)
+	if player.slot == currentSlot
+		$div.addClass("me")
+	else
+		$div.removeClass("me")
 	if player.status
 		$div.addClass("dead")
 	else
@@ -139,8 +144,8 @@ connectServer = (url, f, enter) ->
 				else
 					newPlayer(slot, e.data.substring(2))
 			else if code == 97 # player enter
-				slot = gameCodecDecode(e.data[1])
-				enter(slot)
+				currentSlot = gameCodecDecode(e.data[1])
+				enter(currentSlot)
 			else if code == 98 # player leave
 				removePlayer(gameCodecDecode(e.data[1]))
 			else if code == 101 # stats
