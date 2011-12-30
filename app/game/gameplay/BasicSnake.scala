@@ -11,7 +11,7 @@ class BasicSnake extends BasicGameplay {
 	override def elements: Seq[Element] = super.elements ++ scores.values
 
 	override def enter(instance: Instance, area: Area, tickCount: Int, slot: Slot): Area = {
-		scores += slot -> new Score(slot, 0, tickCount)
+		if (Slot.Players contains slot) scores += slot -> new Score(slot, 0, tickCount)
 		super.enter(instance, area, tickCount, slot)
 	}
 
