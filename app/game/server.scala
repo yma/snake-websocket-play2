@@ -252,7 +252,7 @@ extends Client(instance, player) {
 		code match {
 			case VectorCode(vector) =>
 				instance ! UpdateEntity(mobSlot, _.asInstanceOf[Mob].update(vector))
-			case NameCode(name) => {
+			case ClientNameCode(name) => {
 				instance ! Name(this, name)
 				instance ! Spawn(this)
 			}

@@ -7,114 +7,106 @@ package object codec {
 	import server.Statistics
 
 	object Codec {
+		def valid(num: Int) = num >= 0
 		def encode(num: Int): Char = {
-			assert(num >= 0)
+			assert(valid(num))
 			(num + 1).toChar
 		}
 
+		def valid(code: Char) = code.toInt > 0
 		def decode(code: Char): Int = {
-			val num = code.toInt
-			assert(num > 0)
-			num - 1
+			assert(valid(code))
+			code.toInt - 1
 		}
 
-		def encode[T](element: T)(implicit coder: Coder[T]): String = coder.encode(element)
-		def encode[T](elements: Iterable[T])(implicit coder: Coder[T]): String = {
+		def encode[T](element: T)(implicit coder: Encoder[T]): String = coder.encode(element).get
+		def encode[T](elements: Iterable[T])(implicit coder: Encoder[T]): String = {
 			elements.foldLeft("")(_ + encode(_))
 		}
 
-		def decode[T](code: String)(implicit coder: Coder[T]): T = coder.decode(code)
-		def decodeList[T](code: String)(implicit coder: Coder[T]): List[T] = {
-			code.grouped(coder.chunkSize).map(decode(_)).toList
+		def decode[T](code: String)(implicit coder: Decoder[T]): T = coder.decode(code).get._2
+		def decodeList[T](code: String)(implicit coder: Decoder[T]): List[T] = {
+			def extract(code: String, list: List[T]): List[T] = code match {
+				case "" => list
+				case coder(chunkSize, element) => extract(code.substring(chunkSize), element :: list)
+			}
+			extract(code, Nil).reverse
 		}
 
-		trait Coder[T] {
-			val chunkSize: Int
-			def encode(element: T): String
-			def decode(code: String): T
+		trait Encoder[T] {
+			def encode(element: T): Option[String]
 		}
-	}
 
-	implicit object SlotCoder extends Codec.Coder[Slot] {
-		override val chunkSize: Int = 1
-		override def encode(slot: Slot): String = Codec.encode(slot.value).toString
-		override def decode(code: String): Slot = {
-			assert(code.length == chunkSize)
-			Slot(Codec.decode(code(0)))
+		trait Decoder[T] {
+			def decode(code: String): Option[(Int, T)]
+			def unapply(code: String): Option[(Int, T)] = decode(code)
 		}
 	}
 
-	implicit object VectorCoder extends Codec.Coder[Vector] {
-		override val chunkSize: Int = 1
-		override def encode(vector: Vector): String = Codec.encode(vector.direction).toString
-		override def decode(code: String): Vector = {
-			assert(code.length == chunkSize)
-			Vector.directions(Codec.decode(code(0)))
+	implicit object SlotCoder extends Codec.Encoder[Slot] with Codec.Decoder[Slot] {
+		override def encode(slot: Slot) =
+			if (!Codec.valid(slot.value)) None
+			else Some(Codec.encode(slot.value).toString)
+
+		override def decode(code: String) =
+			if (code.isEmpty || !Codec.valid(code(0))) None
+			else Some(1, Slot(Codec.decode(code(0))))
+	}
+
+	implicit object VectorCoder extends Codec.Encoder[Vector] with Codec.Decoder[Vector] {
+		override def encode(vector: Vector) =
+			Some(Codec.encode(Slot.Command.Vector.slot(vector.direction)).toString)
+
+		override def decode(code: String) = {
+			val slot = SlotCoder.decode(code)
+			if (slot == None || !Slot.Command.Vector.contains(slot.get._2)) None
+			else Some(slot.get._1, Vector.directions(Slot.Command.Vector.index(slot.get._2)))
 		}
 	}
 
-	implicit object PositionCoder extends Codec.Coder[Position] {
-		override val chunkSize: Int = 2
-		override def encode(pos: Position): String = ""+ Codec.encode(pos.x) + Codec.encode(pos.y)
-		override def decode(code: String): Position = {
-			new Position(Codec.decode(code(0)), Codec.decode(code(1)))
+	implicit object PositionCoder extends Codec.Encoder[Position] with Codec.Decoder[Position] {
+		override def encode(pos: Position) =
+			if (!Codec.valid(pos.x) || !Codec.valid(pos.y)) None
+			else Some(""+ Codec.encode(pos.x) + Codec.encode(pos.y))
+
+		override def decode(code: String) =
+			if (code.length < 2 || !Codec.valid(code(0)) || !Codec.valid(code(1))) None
+			else Some(2, Position(Codec.decode(code(0)), Codec.decode(code(1))))
+	}
+
+	implicit object EntityCoder extends Codec.Encoder[Entity] {
+		override def encode(entity: Entity) = {
+			val slot = SlotCoder.encode(if (entity.alive) entity.slotCode else Slot.none)
+			if (slot == None) None
+			else {
+				val pos = PositionCoder.encode(entity.pos)
+				if (pos == None) None
+				else Some(slot.get + pos.get)
+			}
 		}
 	}
 
-	implicit object EntityCoder extends Codec.Coder[Entity] {
-		import resource._
+	implicit object ScoreCoder extends Codec.Encoder[Score] {
+		override def encode(score: Score) =
+			if (!Codec.valid(score.value)) None
+			else {
+				val slot = SlotCoder.encode(score.slot)
+				if (slot == None) None
+				else Some(Codec.encode(Slot.Command.score) + slot.get + Codec.encode(score.value))
+			}
+	}
 
-		override val chunkSize: Int = 1 + PositionCoder.chunkSize
-
-		override def encode(entity: Entity): String =
-			Codec.encode((if (entity.alive) entity.slotCode else Slot.none).value) +
-			PositionCoder.encode(entity.pos)
-
-		override def decode(code: String): Entity = {
-			assert(code.length == chunkSize)
-			throw new RuntimeException()
+	implicit object ElementCoder extends Codec.Encoder[Element] {
+		override def encode(element: Element) = element match {
+			case e: Entity => EntityCoder.encode(e)
+			case e: Score => ScoreCoder.encode(e)
 		}
 	}
 
-	implicit object ScoreCoder extends Codec.Coder[Score] {
-		import resource._
-
-		override val chunkSize: Int = 3
-
-		override def encode(score: Score): String =
-			Codec.encode(Slot.Command.score) + Codec.encode(score.slot) + Codec.encode(score.value)
-
-		override def decode(code: String): Score = {
-			assert(code.length == chunkSize)
-			throw new RuntimeException()
-		}
-	}
-
-	implicit object ElementCoder extends Codec.Coder[Element] {
-		import resource._
-
-		override val chunkSize: Int = 0
-
-		override def encode(element: Element): String = element match {
-			case e: Entity => Codec.encode(e)
-			case e: Score => Codec.encode(e)
-		}
-
-		override def decode(code: String): Score = throw new RuntimeException()
-	}
-
-	implicit object StatisticsCoder extends Codec.Coder[Statistics] {
-		import resource._
-
-		override val chunkSize: Int = 3
-
-		override def encode(stats: Statistics): String =
-			Codec.encode(Slot.Command.stats) + Codec.encode(stats.viewers) + Codec.encode(stats.players)
-
-		override def decode(code: String): Statistics = {
-			assert(code.length == chunkSize)
-			throw new RuntimeException()
-		}
+	implicit object StatisticsCoder extends Codec.Encoder[Statistics] {
+		override def encode(stats: Statistics) =
+			if (!Codec.valid(stats.viewers) || !Codec.valid(stats.players)) None
+			else Some(Codec.encode(Slot.Command.stats) + Codec.encode(stats.viewers) + Codec.encode(stats.players))
 	}
 
 	object PlayerEnterCode {
@@ -140,16 +132,22 @@ package object codec {
 	object NameCode {
 		def apply(slot: Slot, name: String): String =
 			Codec.encode(Slot.Command.name) + Codec.encode(slot) + name
-		def unapply(code: String): Option[String] =
-			if (code.length < 1 || Slot(Codec.decode(code(0))) != Slot.Command.name) None
-			else Some(code.substring(1))
+	}
+
+	object ClientNameCode {
+		def unapply(code: String): Option[String] = {
+			val slot = SlotCoder.decode(code)
+			if (slot == None || slot.get._2 != Slot.Command.name) None
+			else Some(code.substring(slot.get._1))
+		}
 	}
 
 	object VectorCode {
-		def apply(vector: Vector): Slot = Slot(vector.direction)
+		def apply(vector: Vector): String = Codec.encode(vector)
+
 		def unapply(code: String): Option[Vector] = {
-			val index = Slot.Command.Vector.index(Codec.decode[Slot](code))
-			if (index < 4) Some(Vector.directions(index)) else None
+			val vector = VectorCoder.decode(code)
+			if (vector == None) None else Some(vector.get._2)
 		}
 	}
 
