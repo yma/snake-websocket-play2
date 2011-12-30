@@ -28,7 +28,7 @@ class BasicSnake extends BasicGameplay {
 	}
 
 	override def events(area: Area, tickCount: Int, entities: List[Entity]): List[Entity] = {
-		if (area.rand.nextInt(25) == 0) {
+		if (area.rand.nextInt(5000000/area.size) <= 100) {
 			new Food(20 + area.rand.nextInt(80), area.randomPosition(), tickCount) :: entities
 		} else entities
 	}

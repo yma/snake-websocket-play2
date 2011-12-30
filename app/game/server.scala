@@ -24,7 +24,7 @@ package message {
 	package client {
 		case class Command(code: String)
 
-		case class Enter(slot: Slot)
+		case class Enter(slot: Slot, area: Area)
 		case class Dead(entity: Entity)
 
 		case class NotifyLeave(slot: Slot)
@@ -116,7 +116,7 @@ class Instance(val name: String, private var area: Area, gameplay: Gameplay) ext
 					fullAreaCode += client -> true
 					area = gameplay.enter(this, area, tickCount + 1, slot)
 					startTicker()
-					client ! message.client.Enter(slot)
+					client ! message.client.Enter(slot, area)
 					updateStats('enter, slot)
 				}
 
@@ -203,7 +203,7 @@ abstract class Client(instance: Instance, player: Boolean) extends Actor {
 		loop {
 			react {
 				case Command(code) => command(code)
-				case Enter(slot) => enter(slot)
+				case Enter(slot, area) => enter(slot, area)
 				case Dead(entity) => dead(entity)
 
 				case NotifyLeave(slots) => notifyLeave(slots)
@@ -219,7 +219,7 @@ abstract class Client(instance: Instance, player: Boolean) extends Actor {
 
 	def command(code: String) {}
 
-	def enter(slot: Slot) { this.slot = slot }
+	def enter(slot: Slot, area: Area) { this.slot = slot }
 	def dead(entity: Entity) {}
 
 	def notifyLeave(slot: Slot) {}
@@ -258,12 +258,11 @@ extends Client(instance, player) {
 		}
 	}
 
-	override def enter(slot: Slot) {
-		super.enter(slot)
-		if (slot != Slot.none) {
-			mobSlot = Slot.Mob.from(Slot.Players, slot)
-			send(PlayerEnterCode(slot))
-		} else mobSlot = Slot.none
+	override def enter(slot: Slot, area: Area) {
+		super.enter(slot, area)
+		if (slot == Slot.none) mobSlot = Slot.none
+		else mobSlot = Slot.Mob.from(Slot.Players, slot)
+		send(PlayerEnterCode(slot, area))
 	}
 
 	override def notifyLeave(slot: Slot) {

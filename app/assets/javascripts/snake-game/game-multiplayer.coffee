@@ -1,5 +1,6 @@
 ctx = map = null
-gridSize = 40
+gridWidth = gridHeight = 0
+gridDotSize = 4
 players = {}
 currentSlot = 0
 
@@ -54,13 +55,13 @@ decodeEntity = (code) ->
 drawBlock = (pos, item) ->
 	eraseBlock pos
 	ctx.strokeStyle = rgb(item)
-	ctx.strokeRect pos.x * 10 + 0.5, pos.y * 10 + 0.5, 8, 8
+	ctx.strokeRect pos.x * gridDotSize + 0.5, pos.y * gridDotSize + 0.5, gridDotSize - 1, gridDotSize - 1
 	ctx.fillStyle = rgba(item, 0.5)
-	ctx.fillRect pos.x * 10 + 0.5, pos.y * 10 + 0.5, 8, 8
+	ctx.fillRect pos.x * gridDotSize + 0.5, pos.y * gridDotSize + 0.5, gridDotSize - 1, gridDotSize - 1
 
 eraseBlock = (pos) ->
 	ctx.fillStyle = "#27005b"
-	ctx.fillRect pos.x * 10, pos.y * 10, 10, 10
+	ctx.fillRect pos.x * gridDotSize, pos.y * gridDotSize, gridDotSize, gridDotSize
 
 tick = (gameCode) ->
 	while gameCode != ""
@@ -126,11 +127,10 @@ updateStats = (viewers, players) ->
 	$("#stats .viewers").text(viewers)
 	$("#stats .players").text(players)
 
-connectServer = (url, f, enter) ->
+connectServer = (url, init, enter) ->
 	ws = new WebSocket(url)
 	ws.onopen = (e) ->
 		$(".gameOver").hide()
-		f()
 	ws.onclose = (e) ->
 		$(".gameOver .inner").text("La connexion au serveur a été fermé")
 		$(".gameOver").show()
@@ -145,6 +145,9 @@ connectServer = (url, f, enter) ->
 					newPlayer(slot, e.data.substring(2))
 			else if code == 97 # player enter
 				currentSlot = gameCodecDecode(e.data[1])
+				gridWidth = gameCodecDecode(e.data[2])
+				gridHeight = gameCodecDecode(e.data[3])
+				init()
 				enter(currentSlot)
 			else if code == 98 # player leave
 				removePlayer(gameCodecDecode(e.data[1]))
@@ -159,14 +162,18 @@ connectServer = (url, f, enter) ->
 	close: -> ws.close()
 
 init = ->
-	map = (0 for y in [0..(gridSize - 1)] for x in [0..(gridSize - 1)])
+	map = (0 for y in [0..(gridHeight - 1)] for x in [0..(gridWidth - 1)])
 
 	canvas = document.getElementById "game"
-	canvas.width = canvas.width;
+	canvas.width = gridWidth * gridDotSize
+	canvas.height = gridHeight * gridDotSize
 	ctx = canvas.getContext "2d"
+	$(".gameOver")
+		.css("width", (canvas.width + 6) + "px")
+		.css("height", (canvas.height + 6) + "px")
 
 	ctx.fillStyle = "#27005b"
-	ctx.fillRect 0, 0, gridSize * 10, gridSize * 10
+	ctx.fillRect 0, 0, canvas.width, canvas.height
 
 $ ->
 	$("#nameModal").hide()

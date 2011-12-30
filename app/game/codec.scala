@@ -117,8 +117,11 @@ package object codec {
 	}
 
 	object PlayerEnterCode {
-		def apply(slot: Slot): String =
-			Codec.encode(Slot.Command.playerEnter) + Codec.encode(slot)
+		def apply(slot: Slot, area: Area): String =
+			Codec.encode(Slot.Command.playerEnter) +
+			Codec.encode(slot) +
+			Codec.encode(area.width) +
+			Codec.encode(area.height)
 	}
 
 	object PlayerLeaveCode {

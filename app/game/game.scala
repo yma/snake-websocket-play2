@@ -85,6 +85,8 @@ class Area(
 	def this(rand: Random, width: Int, height: Int) = this(rand, width, height, Nil, Map())
 	def this(width: Int, height: Int) = this(new Random(), width, height)
 
+	val size = width * height
+
 	def copy(
 			rand: Random = this.rand,
 			width: Int = this.width,
