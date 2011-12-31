@@ -4,103 +4,99 @@ package object codec {
 
 	import gameplay.Mob
 	import resource.Slot
+	import server.Color
+	import server.Name
 	import server.Statistics
 
 	object Codec {
-		def valid(num: Int) = num >= 0
-		def encode(num: Int): Char = {
-			assert(valid(num))
-			(num + 1).toChar
-		}
+		def rawEncode(num: Int): Option[Char] =
+			if (num >= 0) Some((num + 1).toChar) else None
 
-		def valid(code: Char) = code.toInt > 0
-		def decode(code: Char): Int = {
-			assert(valid(code))
-			code.toInt - 1
-		}
+		def rawDecode(code: Char): Option[Int] =
+			if (code.toInt > 0) Some(code.toInt - 1) else None
 
-		def encode[T](element: T)(implicit coder: Encoder[T]): String = coder.encode(element).get
+		def encode[T](element: T)(implicit coder: Encoder[T]): String = coder(element)
 		def encode[T](elements: Iterable[T])(implicit coder: Encoder[T]): String = {
 			elements.foldLeft("")(_ + encode(_))
 		}
 
-		def decode[T](code: String)(implicit coder: Decoder[T]): T = coder.decode(code).get._2
+		def decode[T](code: String)(implicit coder: Decoder[T]): T = coder.decode(code).get._1
 		def decodeList[T](code: String)(implicit coder: Decoder[T]): List[T] = {
 			def extract(code: String, list: List[T]): List[T] = code match {
 				case "" => list
-				case coder(chunkSize, element) => extract(code.substring(chunkSize), element :: list)
+				case coder(element, tail) => extract(tail, element :: list)
 			}
 			extract(code, Nil).reverse
 		}
 
 		trait Encoder[T] {
-			def encode(element: T): Option[String]
+			def encode(element: T): String
+			def apply(element: T): String = encode(element)
 		}
 
 		trait Decoder[T] {
-			def decode(code: String): Option[(Int, T)]
-			def unapply(code: String): Option[(Int, T)] = decode(code)
+			def decode(code: String): Option[(T, String)]
+			def unapply(code: String): Option[(T, String)] = decode(code)
 		}
 	}
 
-	implicit object SlotCoder extends Codec.Encoder[Slot] with Codec.Decoder[Slot] {
-		override def encode(slot: Slot) =
-			if (!Codec.valid(slot.value)) None
-			else Some(Codec.encode(slot.value).toString)
+	implicit object IntCoder extends Codec.Encoder[Int] with Codec.Decoder[Int] {
+		override def encode(value: Int) = {
+			val code = Codec.rawEncode(value)
+			assert(code != None)
+			code.get.toString
+		}
 
 		override def decode(code: String) =
-			if (code.isEmpty || !Codec.valid(code(0))) None
-			else Some(1, Slot(Codec.decode(code(0))))
+			if (code.isEmpty) None
+			else {
+				val num = Codec.rawDecode(code(0))
+				if (num == None) None else Some(num.get, code.substring(1))
+			}
+	}
+
+	implicit object SlotCoder extends Codec.Encoder[Slot] with Codec.Decoder[Slot] {
+		override def encode(slot: Slot) = IntCoder(slot.value)
+
+		override def decode(code: String) = code match {
+			case IntCoder(num, tail) => Some(Slot(num), tail)
+			case _ => None
+		}
 	}
 
 	implicit object VectorCoder extends Codec.Encoder[Vector] with Codec.Decoder[Vector] {
-		override def encode(vector: Vector) =
-			Some(Codec.encode(Slot.Command.Vector.slot(vector.direction)).toString)
+		override def encode(vector: Vector) = SlotCoder(Slot.Command.Vector.slot(vector.direction))
 
-		override def decode(code: String) = {
-			val slot = SlotCoder.decode(code)
-			if (slot == None || !Slot.Command.Vector.contains(slot.get._2)) None
-			else Some(slot.get._1, Vector.directions(Slot.Command.Vector.index(slot.get._2)))
+		override def decode(code: String) = code match {
+			case SlotCoder(slot, tail) if Slot.Command.Vector.contains(slot) =>
+				Some(Vector.directions(Slot.Command.Vector.index(slot)), tail)
+			case _ => None
 		}
 	}
 
 	implicit object PositionCoder extends Codec.Encoder[Position] with Codec.Decoder[Position] {
-		override def encode(pos: Position) =
-			if (!Codec.valid(pos.x) || !Codec.valid(pos.y)) None
-			else Some(""+ Codec.encode(pos.x) + Codec.encode(pos.y))
+		override def encode(pos: Position) = IntCoder(pos.x) + IntCoder(pos.y)
 
-		override def decode(code: String) =
-			if (code.length < 2 || !Codec.valid(code(0)) || !Codec.valid(code(1))) None
-			else Some(2, Position(Codec.decode(code(0)), Codec.decode(code(1))))
+		override def decode(code: String) = code match {
+			case IntCoder(x, IntCoder(y, tail)) => Some(Position(x, y), tail)
+			case _ => None
+		}
 	}
 
 	implicit object EntityCoder extends Codec.Encoder[Entity] {
-		override def encode(entity: Entity) = {
-			val slot = SlotCoder.encode(if (entity.alive) entity.slotCode else Slot.none)
-			if (slot == None) None
-			else {
-				val pos = PositionCoder.encode(entity.pos)
-				if (pos == None) None
-				else Some(slot.get + pos.get)
-			}
-		}
+		override def encode(entity: Entity) =
+			SlotCoder(if (entity.alive) entity.slotCode else Slot.none) +
+			PositionCoder(entity.pos)
 	}
 
 	implicit object PlayerCoder extends Codec.Encoder[Player] {
-		override def encode(player: Player) = {
-			val status = player.status match {
-				case 'alive => Some(0)
-				case 'dead => Some(1)
-				case _ => None
-			}
-			val value = status.map(_ + player.score * 2)
-			if (value == None || !Codec.valid(value.get)) None
-			else {
-				val slot = SlotCoder.encode(player.slot)
-				if (slot == None) None
-				else Some(Codec.encode(Slot.Command.player) + slot.get + Codec.encode(value.get))
-			}
-		}
+		override def encode(player: Player) =
+			SlotCoder(Slot.Command.player) +
+			SlotCoder(player.slot) +
+			IntCoder((player.status match {
+				case 'alive => 0
+				case 'dead => 1
+			}) + player.score * 2)
 	}
 
 	implicit object ElementCoder extends Codec.Encoder[Element] {
@@ -112,8 +108,19 @@ package object codec {
 
 	implicit object StatisticsCoder extends Codec.Encoder[Statistics] {
 		override def encode(stats: Statistics) =
-			if (!Codec.valid(stats.viewers) || !Codec.valid(stats.players)) None
-			else Some(Codec.encode(Slot.Command.stats) + Codec.encode(stats.viewers) + Codec.encode(stats.players))
+			SlotCoder(Slot.Command.stats) + IntCoder(stats.viewers) + IntCoder(stats.players)
+	}
+
+	implicit object ColorCoder extends Codec.Encoder[Color] with Codec.Decoder[Color] {
+		override def encode(color: Color) =
+			IntCoder(color.red) +
+			IntCoder(color.green) +
+			IntCoder(color.blue)
+
+		override def decode(code: String) = code match {
+			case IntCoder(red, IntCoder(green, IntCoder(blue, tail))) => Some(Color(red, green, blue), tail)
+			case _ => None
+		}
 	}
 
 	object PlayerEnterCode {
@@ -135,24 +142,26 @@ package object codec {
 	}
 
 	object NameCode {
-		def apply(slot: Slot, name: String): String =
-			Codec.encode(Slot.Command.name) + Codec.encode(slot) + name
+		def apply(slot: Slot, name: Name): String =
+			Codec.encode(Slot.Command.name) +
+			Codec.encode(slot) +
+			Codec.encode(name.color) +
+			name.value
 	}
 
 	object ClientNameCode {
-		def unapply(code: String): Option[String] = {
-			val slot = SlotCoder.decode(code)
-			if (slot == None || slot.get._2 != Slot.Command.name) None
-			else Some(code.substring(slot.get._1))
+		def unapply(code: String): Option[Name] = code match {
+			case SlotCoder(Slot.Command.name, ColorCoder(color, name)) => Some(Name(name, color))
+			case _ => None
 		}
 	}
 
 	object VectorCode {
 		def apply(vector: Vector): String = Codec.encode(vector)
 
-		def unapply(code: String): Option[Vector] = {
-			val vector = VectorCoder.decode(code)
-			if (vector == None) None else Some(vector.get._2)
+		def unapply(code: String): Option[Vector] = code match {
+			case VectorCoder(vector, "") => Some(vector)
+			case _ => None
 		}
 	}
 

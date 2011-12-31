@@ -52,11 +52,14 @@ decodeEntity = (code) ->
 		y: gameCodecDecode(code[2])
 
 
-drawBlock = (pos, item) ->
+drawBlock = (pos, inside, edges) ->
 	eraseBlock pos
-	ctx.strokeStyle = rgb(item)
+	ctx.strokeStyle = rgb(edges)
 	ctx.strokeRect pos.x * gridDotSize + 0.5, pos.y * gridDotSize + 0.5, gridDotSize - 1, gridDotSize - 1
-	ctx.fillStyle = rgba(item, 0.5)
+	if inside == edges
+		ctx.fillStyle = rgba(inside, 0.5)
+	else
+		ctx.fillStyle = rgb(inside)
 	ctx.fillRect pos.x * gridDotSize + 0.5, pos.y * gridDotSize + 0.5, gridDotSize - 1, gridDotSize - 1
 
 eraseBlock = (pos) ->
@@ -70,25 +73,31 @@ tick = (gameCode) ->
 		if entity.id == 100 # player
 			updatePlayer(entity.pos.x, entity.pos.y)
 		else if entity.id != 0
-			item = Item[entity.id]
-			if item == undefined
-				item = Item[0]
-			drawBlock(entity.pos, item)
+			insideColor = edgesColor = Item[entity.id]
+			if insideColor == undefined
+				edgesColor = Item[0]
+				player = players[entity.id]
+				if player == undefined
+					insideColor = edgesColor
+				else
+					insideColor = player.color
+			drawBlock(entity.pos, insideColor, edgesColor)
 		else
 			eraseBlock entity.pos
 
 resetPlayers = ->
 	$("#players").html("")
 
-newPlayer = (slot, name) ->
+newPlayer = (slot, color, name) ->
 	block = """
 		<div id="player-slot-${slot}" class="player">
-			<div class="square" style="background-color: #e44;"></div>
+			<div class="square" style="background-color: ${color};"></div>
 			<span class="name">${name}</span>
 			<span class="score">?</span>
 		</div>
 		"""
 		.replace("${slot}", slot)
+		.replace("${color}", rgb(color))
 		.replace("${name}", name)
 	$("#players").append(block)
 
@@ -98,13 +107,20 @@ newPlayer = (slot, name) ->
 			slot: slot,
 			status: 1,
 			score: "?"
+	else
+		player.color = color
+		players[slot] = player
 	updatePlayerDisplay(player)
 
 updatePlayer = (slot, statusScore) ->
-	player = players[slot] =
-		slot: slot,
-		status: statusScore & 1
-		score: (statusScore & ~1) / 2
+	player = players[slot]
+	if player == undefined
+		player =
+			slot: slot,
+			color: Item[0]
+	player.status = statusScore & 1
+	player.score = (statusScore & ~1) / 2
+	players[slot] = player
 	updatePlayerDisplay(player)
 
 updatePlayerDisplay = (player) ->
@@ -142,7 +158,11 @@ connectServer = (url, init, enter) ->
 				if slot == 0
 					resetPlayers()
 				else
-					newPlayer(slot, e.data.substring(2))
+					color =
+						r: gameCodecDecode(e.data[2]) * 2
+						g: gameCodecDecode(e.data[3]) * 2
+						b: gameCodecDecode(e.data[4]) * 2
+					newPlayer(slot, color, e.data.substring(5))
 			else if code == 97 # player enter
 				currentSlot = gameCodecDecode(e.data[1])
 				gridWidth = gameCodecDecode(e.data[2])
@@ -157,7 +177,12 @@ connectServer = (url, init, enter) ->
 				tick(e.data)
 	ws.onerror = (e) -> alert("error: "+ e.data)
 
-	spawn: (name) -> ws.send(gameCodecEncode(96) + name)
+	spawn: (color, name) -> ws.send(
+		gameCodecEncode(96) +
+		gameCodecEncode(color.r / 2) +
+		gameCodecEncode(color.g / 2) +
+		gameCodecEncode(color.b / 2) +
+		name)
 	command: (vector) -> ws.send(gameCodecEncode(102 + vector))
 	close: -> ws.close()
 
@@ -200,5 +225,9 @@ $ ->
 	$("#nameModal form").submit ->
 		name = $("#nameModal form input[type=text]").val()
 		$("#nameModal").hide()
-		server.spawn(name)
+		server.spawn(
+			r: Math.random() * 126
+			g: Math.random() * 126
+			b: Math.random() * 126,
+			name)
 		return false

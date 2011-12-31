@@ -15,7 +15,7 @@ package message {
 	package instance {
 		case class Enter(client: Client, slot: Slot)
 		case class Leave(client: Client)
-		case class Name(client: Client, name: String)
+		case class SetName(client: Client, name: Name)
 		case class Spawn(client: Client)
 		case class Tick(ticker: Ticker, count: Int)
 		case class UpdateEntity(slot: Slot, f: (Entity) => Entity)
@@ -28,8 +28,8 @@ package message {
 		case class Dead(entity: Entity)
 
 		case class NotifyLeave(slot: Slot)
-		case class NotifyName(slot: Slot, name: String)
-		case class NotifyNames(names: Map[Slot, String])
+		case class NotifyName(slot: Slot, name: Name)
+		case class NotifyNames(names: Map[Slot, Name])
 		case class NotifyStats(stats: Statistics)
 
 		case class Tick(count: Int, code: String)
@@ -56,6 +56,11 @@ case class Statistics(viewers: Int, players: Int) {
 }
 
 
+case class Color(red: Int, green: Int, blue: Int)
+
+case class Name(value: String, color: Color)
+
+
 class Instance(val name: String, private var area: Area, gameplay: Gameplay) extends Actor {
 	val playerSlots = new Slots(Slot.Players)
 	val gameplaySlots = new Slots(Slot.Gameplay)
@@ -64,7 +69,7 @@ class Instance(val name: String, private var area: Area, gameplay: Gameplay) ext
 	private var ticker: Option[Ticker] = None
 
 	private val clientSlots = scala.collection.mutable.Map[Client, Slot]()
-	private val clientNames = scala.collection.mutable.Map[Client, String]()
+	private val clientNames = scala.collection.mutable.Map[Client, Name]()
 	private val fullAreaCode = scala.collection.mutable.Map[Client, Boolean]()
 
 	private var stats: Statistics = new Statistics(0, 0)
@@ -120,7 +125,7 @@ class Instance(val name: String, private var area: Area, gameplay: Gameplay) ext
 					updateStats('enter, slot)
 				}
 
-				case Name(client, name) => {
+				case SetName(client, name) => {
 					clientNames += client -> name
 					notifyClients(message.client.NotifyName(clientSlots(client), name))
 				}
@@ -223,8 +228,8 @@ abstract class Client(instance: Instance, player: Boolean) extends Actor {
 	def dead(entity: Entity) {}
 
 	def notifyLeave(slot: Slot) {}
-	def notifyName(slot: Slot, name: String) {}
-	def notifyNames(names: Map[Slot, String]) {}
+	def notifyName(slot: Slot, name: Name) {}
+	def notifyNames(names: Map[Slot, Name]) {}
 	def notifyStats(stats: Statistics) {}
 
 	def tick(tickCount: Int, code: String) {}
@@ -252,7 +257,7 @@ extends Client(instance, player) {
 			case VectorCode(vector) =>
 				instance ! UpdateEntity(mobSlot, _.asInstanceOf[Mob].update(vector))
 			case ClientNameCode(name) => {
-				instance ! Name(this, name)
+				instance ! SetName(this, name)
 				instance ! Spawn(this)
 			}
 		}
@@ -275,7 +280,7 @@ extends Client(instance, player) {
 		def act() {
 			loop {
 				react {
-					case ('name, slot: Slot, name: String) => {
+					case ('name, slot: Slot, name: Name) => {
 						client ! message.client.NotifyName(slot, name)
 						Thread.sleep(100)
 					}
@@ -286,13 +291,13 @@ extends Client(instance, player) {
 	}
 	private val notifyNamesDelayer = new NotifyNamesDelayer(this)
 
-	override def notifyNames(names: Map[Slot, String]) {
+	override def notifyNames(names: Map[Slot, Name]) {
 		super.notifyNames(names)
 		send(ResetNamesCode())
 		for ((slot, name) <- names) notifyNamesDelayer ! ('name, slot, name)
 	}
 
-	override def notifyName(slot: Slot, name: String) {
+	override def notifyName(slot: Slot, name: Name) {
 		super.notifyName(slot, name)
 		if (Slot.Players contains slot) send(NameCode(slot, name))
 	}
