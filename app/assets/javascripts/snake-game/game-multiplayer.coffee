@@ -134,14 +134,14 @@ updatePlayerDisplay = (player) ->
 	$div = $("#player-slot-" + player.slot)
 	if player.slot == currentSlot
 		$div.addClass("me")
+		$("#restart").show() if player.status
 	else
 		$div.removeClass("me")
 	if player.status
 		$div.addClass("dead")
-		$("#restart").show()
 	else
 		$div.removeClass("dead")
-		$("#restart").hide()
+
 	$(".score", $div).text(player.score)
 
 removePlayer = (slot) ->
@@ -157,7 +157,7 @@ connectServer = (url, init, enter) ->
 	ws.onopen = (e) ->
 		$(".gameOver").hide()
 	ws.onclose = (e) ->
-		$(".gameOver .inner").text("La connexion au serveur a été fermé")
+		$(".gameOver .inner").text("The serveur connection has been closed.")
 		$(".gameOver").show()
 	ws.onmessage = (e) ->
 		if e.data
@@ -232,7 +232,7 @@ $ ->
 		server.close()
 		server = connectServer snakeGameWebsocketPlayer, init, (slot) ->
 			server.spawn(playerColor, playerName)
-			$("#restart").hide()
+			setTimeout((-> $("#restart").hide()), 100)
 
 	$("#nameModal form").submit ->
 		name = $("#nameModal form input[type=text]").val()
