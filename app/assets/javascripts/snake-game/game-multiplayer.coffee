@@ -114,9 +114,8 @@ newPlayer = (slot, color, name) ->
 			slot: slot,
 			status: 1,
 			score: "?"
-	else
-		player.color = color
-		players[slot] = player
+	player.color = color
+	players[slot] = player
 	updatePlayerDisplay(player)
 
 updatePlayer = (slot, statusScore) ->
