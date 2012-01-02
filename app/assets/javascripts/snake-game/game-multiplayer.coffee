@@ -42,17 +42,17 @@ Item =
 		g: 0
 		b: 0
 
-rgb = (item) -> "rgb(" + item.r + "," + item.g + "," + item.b + ")"
-rgba = (item, alpha) -> "rgba(" + item.r + "," + item.g + "," + item.b + ", " + alpha + ")"
+rgb = (item) -> "rgb(#{item.r},#{item.g},#{item.b})"
+rgba = (item, alpha) -> "rgba(#{item.r},#{item.g},#{item.b},#{alpha})"
 
 gameCodecEncode = (num) ->
 	if num < 0
-		alert("Can't encode "+ num +" ("+ size +")")
+		alert("Can't encode #{num} (#{size})")
 	String.fromCharCode(num + 1)
 
 gameCodecDecode = (code) ->
 	if code.length != 1
-		alert("Invalid code "+ code)
+		alert("Invalid code #{code}")
 	code.charCodeAt(0) - 1
 
 decodeEntity = (code) ->
