@@ -3,6 +3,8 @@ gridWidth = gridHeight = 0
 gridDotSize = 11
 players = {}
 currentSlot = 0
+playerName = null
+playerColor = null
 
 colors = ["e2e01e", "e27f1e", "1ee271", "1edbe2", "1e63e2", "1e1ee2", "7f1ee2", "e01ee2", "e21e88"]
 rgbColors = []
@@ -65,7 +67,7 @@ drawBlock = (pos, inside, isPlayer) ->
 		ctx.strokeStyle = rgba(inside, 1)
 		ctx.fillStyle = rgba(inside, 0.6)
 	else
-		ctx.strokeStyle = rgba(inside, 0.4)
+		ctx.strokeStyle = rgba(inside, 0.3)
 		ctx.fillStyle = rgba(inside, 0.6)
 	ctx.strokeRect pos.x * gridDotSize + 0.5, pos.y * gridDotSize + 0.5, gridDotSize - 1, gridDotSize - 1
 	ctx.fillRect pos.x * gridDotSize + 0.5, pos.y * gridDotSize + 0.5, gridDotSize - 1, gridDotSize - 1
@@ -136,8 +138,10 @@ updatePlayerDisplay = (player) ->
 		$div.removeClass("me")
 	if player.status
 		$div.addClass("dead")
+		$("#restart").show()
 	else
 		$div.removeClass("dead")
+		$("#restart").hide()
 	$(".score", $div).text(player.score)
 
 removePlayer = (slot) ->
@@ -182,12 +186,13 @@ connectServer = (url, init, enter) ->
 				tick(e.data)
 	ws.onerror = (e) -> alert("error: "+ e.data)
 
-	spawn: (color, name) -> ws.send(
-		gameCodecEncode(96) +
-		gameCodecEncode(color.r / 2) +
-		gameCodecEncode(color.g / 2) +
-		gameCodecEncode(color.b / 2) +
-		name)
+	spawn: (color, name) ->
+		ws.send(
+			gameCodecEncode(96) +
+			gameCodecEncode(color.r / 2) +
+			gameCodecEncode(color.g / 2) +
+			gameCodecEncode(color.b / 2) +
+			name)
 	command: (vector) -> ws.send(gameCodecEncode(102 + vector))
 	close: -> ws.close()
 
@@ -222,10 +227,18 @@ $ ->
 		server = connectServer snakeGameWebsocketPlayer, init, (slot) ->
 			$("#nameModal").show()
 			$("#nameModal form input[type=text]").val("Player" + slot).focus()
-		return false
+
+	$("#restart").click ->
+		server.close()
+		server = connectServer snakeGameWebsocketPlayer, init, (slot) ->
+			server.spawn(playerColor, playerName)
+			$("#restart").hide()
 
 	$("#nameModal form").submit ->
 		name = $("#nameModal form input[type=text]").val()
 		$("#nameModal").hide()
-		server.spawn(rgbColors[Math.floor(Math.random() * 9)] , name)
+		playerName = name
+		playerColor = rgbColors[Math.floor(Math.random() * 9)]
+		server.spawn(playerColor, playerName)
+		$("#play").hide()
 		return false
