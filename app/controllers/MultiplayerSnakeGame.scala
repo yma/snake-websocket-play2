@@ -15,7 +15,7 @@ object MultiplayerSnakeGame extends Controller {
 		Ok(views.html.index(request.headers("Host")))
 	}
 
-	val MainInstance = new Instance("main", new game.Area(127, 127), new EvilAngelSnake())
+	val MainInstance = new Instance("main", new game.Area(40, 40), new EvilAngelSnake())
 
 	def client(player: String) = WebSocket[String] { request => (in, out) =>
 		import game.server.message.client._

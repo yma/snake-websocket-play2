@@ -1,8 +1,16 @@
 ctx = map = null
 gridWidth = gridHeight = 0
-gridDotSize = 4
+gridDotSize = 11
 players = {}
 currentSlot = 0
+
+colors = ["e2e01e", "e27f1e", "1ee271", "1edbe2", "1e63e2", "1e1ee2", "7f1ee2", "e01ee2", "e21e88"]
+rgbColors = []
+for color in colors
+	rgbColors.push
+		r: parseInt(color.substr(0,2), 16)
+		g: parseInt(color.substr(2,2), 16)
+		b: parseInt(color.substr(4,2), 16)
 
 KEY =
 	LEFT_ARROW: 37
@@ -51,15 +59,15 @@ decodeEntity = (code) ->
 		x: gameCodecDecode(code[1])
 		y: gameCodecDecode(code[2])
 
-
-drawBlock = (pos, inside, edges) ->
+drawBlock = (pos, inside, isPlayer) ->
 	eraseBlock pos
-	ctx.strokeStyle = rgb(edges)
-	ctx.strokeRect pos.x * gridDotSize + 0.5, pos.y * gridDotSize + 0.5, gridDotSize - 1, gridDotSize - 1
-	if inside == edges
-		ctx.fillStyle = rgba(inside, 0.5)
+	if isPlayer
+		ctx.strokeStyle = rgba(inside, 1)
+		ctx.fillStyle = rgba(inside, 0.6)
 	else
-		ctx.fillStyle = rgb(inside)
+		ctx.strokeStyle = rgba(inside, 0.4)
+		ctx.fillStyle = rgba(inside, 0.6)
+	ctx.strokeRect pos.x * gridDotSize + 0.5, pos.y * gridDotSize + 0.5, gridDotSize - 1, gridDotSize - 1
 	ctx.fillRect pos.x * gridDotSize + 0.5, pos.y * gridDotSize + 0.5, gridDotSize - 1, gridDotSize - 1
 
 eraseBlock = (pos) ->
@@ -81,7 +89,7 @@ tick = (gameCode) ->
 					insideColor = edgesColor
 				else
 					insideColor = player.color
-			drawBlock(entity.pos, insideColor, edgesColor)
+			drawBlock(entity.pos, insideColor, entity.id < 64)
 		else
 			eraseBlock entity.pos
 
@@ -89,17 +97,14 @@ resetPlayers = ->
 	$("#players").html("")
 
 newPlayer = (slot, color, name) ->
-	block = """
-		<div id="player-slot-${slot}" class="player">
-			<div class="square" style="background-color: ${color};"></div>
-			<span class="name">${name}</span>
+	$("#players").append """
+		<div id="player-slot-#{slot}" class="player">
+			<div class="square" style="background-color: #{rgba(color, 0.6)}; border-color: #{rgba(color, 1)}"></div>
+			<span class="name">#{name}</span>
+			<span class="deadText">- dead</span>
 			<span class="score">?</span>
 		</div>
 		"""
-		.replace("${slot}", slot)
-		.replace("${color}", rgb(color))
-		.replace("${name}", name)
-	$("#players").append(block)
 
 	player = players[slot]
 	if player == undefined
@@ -197,9 +202,6 @@ init = ->
 		.css("width", (canvas.width + 6) + "px")
 		.css("height", (canvas.height + 6) + "px")
 
-	ctx.fillStyle = "#27005b"
-	ctx.fillRect 0, 0, canvas.width, canvas.height
-
 $ ->
 	$("#nameModal").hide()
 	server = connectServer snakeGameWebsocketViewer, init, ->
@@ -215,7 +217,7 @@ $ ->
 		init()
 		$(".gameOver").hide()
 
-	$("#play").submit ->
+	$("#play").click ->
 		server.close()
 		server = connectServer snakeGameWebsocketPlayer, init, (slot) ->
 			$("#nameModal").show()
@@ -225,9 +227,5 @@ $ ->
 	$("#nameModal form").submit ->
 		name = $("#nameModal form input[type=text]").val()
 		$("#nameModal").hide()
-		server.spawn(
-			r: Math.random() * 126
-			g: Math.random() * 126
-			b: Math.random() * 126,
-			name)
+		server.spawn(rgbColors[Math.floor(Math.random() * 9)] , name)
 		return false

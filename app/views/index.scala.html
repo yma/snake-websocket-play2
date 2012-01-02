@@ -12,34 +12,34 @@
 	<section class="gameWrapper">
 		<header>
 			<h1>Snake Multiplayer</h1>
+			<p>To invite someone to join the game just share the link with him.</p>
 		</header>
 
-		<aside class="left">
-			<div class="gameOver">
-				<div class="inner">
-					Game over, your score is <span class="finalScore"></span>
-					<div class="restart">
-						<a href="javascript:;">Restart</a>
+		<div class="frame">
+			<aside class="left">
+				<div class="gameOver">
+					<div class="inner">
+						Game over, your score is <span class="finalScore"></span>
+						<div class="restart">
+							<a href="javascript:;">Restart</a>
+						</div>
 					</div>
 				</div>
-			</div>
-			<canvas id="game" width="400" height="400"></canvas>
+				<canvas id="game" width="400" height="400"></canvas>
+			</aside>
 
-			<form id="play">
-				<button type="submit" class="button">Play!</button>
-			</form>
-		</aside>
-
-		<aside class="right">
-			<div id="stats">
-				<div>
-					Viewers: <span class="viewers">0</span>,
+			<aside class="right">
+				<div id="stats">
+					Viewers: <span class="viewers">0</span>
 					Players: <span class="players">0</span>
 				</div>
-			</div>
-			<div id="players">
-			</div>
-		</aside>
+				<div id="players">
+				</div>
+				<div id="playButton">
+					<button id="play" class="button green bigrounded" type="button">Play!</button>
+				</div>
+			</aside>
+		</div>
 
 		<div class="credits">
 			This is a Play 2.0 experiment with Scala and Websockets.
@@ -52,7 +52,7 @@
 			<h1>Please enter your nickname</h1>
 			<form>
 				<input type="text" value="Player1" />
-				<button type="submit" class="button">Start</button>
+				<button type="submit" class="button bigrounded green">Start</button>
 			</form>
 		</div>
 	</section>
