@@ -194,12 +194,11 @@ class Instance(val name: String, private var area: Area, gameplay: Gameplay) ext
 }
 
 
-abstract class Client(instance: Instance, player: Boolean) extends Actor {
+abstract class Client(instance: Instance) extends Actor {
 	protected var slot: Slot = Slot.none
 	def slots: Slots
 
 	start()
-	instance.clientEnter(this, player)
 
 	def spawnMob(pos: Position, vector: Vector, tickCount: Int): Mob
 
@@ -239,12 +238,12 @@ abstract class Client(instance: Instance, player: Boolean) extends Actor {
 	}
 }
 
-class PlayerClient(instance: Instance, player: Boolean, out: Iteratee[String, Unit])
-extends Client(instance, player) {
+class PlayerClient(instance: Instance, player: Boolean) extends Client(instance) {
 	protected var mobSlot: Slot = Slot.none
 	override def slots: Slots = instance.playerSlots
 
-	private def send(code: String) { out.feed(new Input.El(code)) }
+	val out = Enumerator.imperative[String](onStart = instance.clientEnter(this, player))
+	private def send(code: String) { out.push(code) }
 
 	override def spawnMob(pos: Position, vector: Vector, tickCount: Int): Mob = {
 		new Mob(mobSlot, slot, 3, pos, vector, false, tickCount)

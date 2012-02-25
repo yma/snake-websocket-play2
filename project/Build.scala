@@ -5,7 +5,7 @@ import PlayProject._
 object ApplicationBuild extends Build {
 
     val appName         = "snake-play2"
-    val appVersion      = "1.0"
+    val appVersion      = "1.0-SNAPSHOT"
 
     val appDependencies = Seq(
       // Add your project dependencies here,
